@@ -2,7 +2,7 @@
 id: 009
 title: Build the CLI skeleton with login, logout and status
 milestone: M0
-status: todo
+status: done
 deps: [012]
 touches: [cli/, Cargo.lock]
 spec: ["7. Clients & UI", "2. Architecture & Stack", "9. Security & Self-Hosting"]
@@ -24,4 +24,8 @@ spec: ["7. Clients & UI", "2. Architecture & Stack", "9. Security & Self-Hosting
 - Any object/task commands, the TUI (M15), API token commands.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- New subcommand = `src/cmd/<name>.rs` returning `Output { human, json }`, plus a `Command` variant; recipe in `cli/API.md`.
+- Use `ctx.client()` and `reply.ok()?`: 401 already becomes the "run polykov login" error, transport failures the "cannot reach server" one.
+- The stored token is only sent to the server it was issued by (`CliConfig::token_for`); `--server` elsewhere runs unauthenticated.
+- `status` exits 0 whenever the server answers (token `valid`/`invalid`/`none`); `logout` with a rejected token clears it and exits 1.
+- `--json` errors go to stderr like text errors; stdout stays empty on failure. `tests/common` starts the real router on a random port.
