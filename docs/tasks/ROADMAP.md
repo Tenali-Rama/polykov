@@ -1,0 +1,23 @@
+# Roadmap
+
+One line per milestone: `M<n> — <goal> — spec: <sections>`. Each milestone ends in something the owner can use or demo. The planner writes task files for one milestone at a time.
+
+- M0 — Foundation: `docker compose up`, open the web UI, set the owner password, log in; `polykov login` + `polykov status` from the CLI; CI green with a smoke test — spec: 2. Architecture & Stack, 9. Security & Self-Hosting, 10. Non-Functional
+- M1 — Object core: objects with tags (hierarchical), links + backlinks, pins, archive, soft delete + 30-day trash; REST CRUD, CLI CRUD with `--json`, web object list/detail — spec: 3. Data Model, Organization
+- M2 — Tasks and capture: Inbox/Today/Upcoming/Someday/Anytime, projects/sections/areas, sub-tasks, checklists, priorities, recurrence; NL-parser experiment then smart add in CLI (`polykov add`, `polykov today`) and web capture bar (`Ctrl+Space`, live token highlight) — spec: Tasks (GTD), Capture, 5. Intelligence
+- M3 — Search and views: FTS5 global fuzzy search (< 100 ms on 100k objects), view query language, saved views with list/Kanban/Eisenhower layouts, smart sort, command palette (`Ctrl+K`, `>` in capture bar), favourites sidebar — spec: Organization, Tasks (GTD)
+- M4 — Notes: notebooks, TipTap block editor with markdown round-trip, wikilinks + backlinks panel, front-matter properties queryable in views, focus mode, floating TOC, image attachments, link previews — spec: Notes, 3. Data Model
+- M5 — Live sync and offline: WebSocket push to all clients, client cache, offline write queue, last-write-wins per field, OpenAPI document — spec: 2. Architecture & Stack, 10. Non-Functional
+- M6 — Time and focus: one-click tracking, time entries, stopwatch/countdown/pomodoro/estimate timers, floating timer (web), ambient sounds, actual-vs-estimate; CLI timer — spec: Time & Focus, Tasks (GTD)
+- M7 — Journal, daily notes and habits: interstitial entries (`polykov j`), mood/energy, task context from running timer, auto daily note; habit library, check-ins, streaks, heatmap — spec: Journaling, Habits, 3. Data Model
+- M8 — Calendar and planning: day/week/month views, timeline/Gantt and calendar layouts, time blocking with buffers and overbooking flags, CalDAV two-way sync, ICS subscriptions, rule-based day planner — spec: Calendar & Planning, Tasks (GTD)
+- M9 — Goals, reviews and reminders: goals → milestones with auto progress, review templates that fill themselves in, per-object reminders, web push + desktop notifications, quiet hours, background job runner — spec: Goals, Reviews, Reminders & Notifications
+- M10 — Telegram: owner-only bot, text to smart add, `/j` `/n` `/t`, `/today` `/done` `/habit` `/timer`, reminders and digests — spec: 6. Telegram Integration
+- M11 — Local intelligence: auto-tagger, speech-to-text + voice input (web and Telegram), journal activity labels/topics/sentiment; each after its experiment in `docs/models/`; model trait, shadow evaluation, rollback, config switches — spec: 5. Intelligence, Capture, Journaling
+- M12 — Analytics and forecasts: decision-driving analytics per area, calibrated forecast ranges with backtests, forecast feedback loop, model accuracy page, query-filterable charts, journal analytics, review auto-summaries — spec: Analytics & Forecasts, Journaling, Reviews
+- M13 — Linux desktop app: Tauri 2 wrapper, system-wide capture hotkey, tray icon, always-on-top floating timer, native notifications, release job — spec: 7. Clients & UI, Capture, Time & Focus
+- M14 — Android app: Tauri 2 phone/tablet, touch layout with swipe actions and split pane, Kotlin widgets (Today, quick add, habit, timer), quick-settings tile, share target, notification timer — spec: 7. Clients & UI, Capture
+- M15 — TUI and CLI completion: `polykov tui` main views, CLI parity for views/journal/timer/habits — spec: 7. Clients & UI
+- M16 — Customization and accessibility: themes, custom colors/icons/CSS, background image, rebindable shortcuts, vim mode, toggleable modules, sidebar ordering, WCAG AA, reduced motion — spec: 8. Customization & Accessibility
+- M17 — Data ownership and self-hosting: import (CSV, Markdown) with field mapping, full export (MD + CSV + JSON), daily backups with rotation + restore, TOTP 2FA, optional built-in TLS, systemd unit, one-command install, docs — spec: Capture, 9. Security & Self-Hosting, 1. Principles
+- M18 — Gamification: karma, levels, pixel-art badges, daily/weekly karma goals, all toggleable — spec: Gamification (toggleable)
