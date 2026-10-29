@@ -2,8 +2,10 @@
 
 pub mod app;
 pub mod auth;
+pub mod comments;
 pub mod config;
 pub mod db;
 pub mod http;
+pub mod links;
 pub mod objects;
 pub mod web;

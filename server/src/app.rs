@@ -19,6 +19,8 @@ pub fn router(db: Db, web_dir: &Path) -> Router {
         .route("/health", get(health))
         .merge(auth::routes())
         .merge(crate::objects::routes())
+        .merge(crate::links::routes())
+        .merge(crate::comments::routes())
         .route("/api", any(not_found))
         .route("/api/", any(not_found))
         .route("/api/{*rest}", any(not_found))
