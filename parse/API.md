@@ -15,6 +15,10 @@ Crate `polykov_parse`. Pure: no I/O, no network, no clock. See ADR 0009.
 - `Recurrence { rule: String, from: Anchor }`, `Anchor::{Scheduled, Completion}`: `rule` is in the 027 RRULE subset (`FREQ=…[;INTERVAL=n][;BYDAY=..][;BYMONTHDAY=n]`, `INTERVAL` left out when 1).
 - All output types derive `Serialize`; `Kind` and `Anchor` serialize lowercase (`"date"`, `"scheduled"`).
 - `RulesParser`: unit struct, the rules baseline.
+- `default_parser() -> Box<dyn Parser>`: what smart add uses. Today the 030 benchmark winner, `TaggerParser` with the bundled `src/tagger/model.bin` (falls back to `RulesParser` if that can't be read). Results: `docs/models/nl-parser.md`, ADR 0012.
+- `TaggerParser`: averaged-perceptron token tagger; tagged spans are read by the rules matchers below, so it accepts the same syntax and only decides which words are tokens.
+  - `TaggerParser::train(&[Labeled], epochs) -> TaggerParser`; `Labeled { input, ctx: Context, labels: Vec<Option<(Kind, bool)>> }`, one label per word (`bool`: the word starts the token).
+  - `to_bytes() -> Vec<u8>`, `from_bytes(&[u8]) -> Option<TaggerParser>`, `model_bytes() -> usize`.
 
 ## `RulesParser` syntax
 Words are matched left to right, ignoring case; a phrase is whole words. For a field given twice the first value wins, but every match is a token and leaves the title.
