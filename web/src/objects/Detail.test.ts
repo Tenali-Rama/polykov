@@ -11,6 +11,8 @@ function api(obj: Obj, more: Record<string, Route> = {}, reply?: (patch: Partial
   const fetch = stubApi({
     'GET /api/objects/7': () => Response.json(obj),
     'GET /api/objects/7/attachments': () => Response.json({ attachments: [] }),
+    'GET /api/objects/7/links': () => Response.json({ links: [], backlinks: [] }),
+    'GET /api/objects/7/comments': () => Response.json({ comments: [] }),
     'PATCH /api/objects/7': (_url, init) => {
       const patch = JSON.parse(String(init?.body)) as Partial<Obj>;
       patches.push(patch);

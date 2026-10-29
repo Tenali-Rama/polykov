@@ -10,7 +10,9 @@
 | `src/objects/List.svelte` | Object list (no props): `TagTree` sidebar, `CreateForm`, filters (type, `pinned only`, archived `false`/`true`/`any`), a `trash` link to `#/trash`, rows `* title type #tags` linking to `#/o/<id>`, pages of 50 via `[ more ]`, `no objects` when empty, `error: <cause>` on failure. `j`/`k` move the selection (focusing the row), `Enter` opens it; ignored while focus is in a control (`ownsKeys`). |
 | `src/objects/TagTree.svelte` | Tag folders from `GET /api/tags`: an `all` entry, then each folder indented by depth with its leaf name and count. Props: `selected` (`''` = all), `onselect(tag)`. |
 | `src/objects/CreateForm.svelte` | Create prompt: type select (default `note`), title input, Enter or `[ add ]` submits; clears the title and calls `oncreated(obj)`; a failure shows the server text (`ApiError` message) inline. |
-| `src/objects/Detail.svelte` | Object page. Props: `id` (read once; Shell re-creates it per id), `ondeleted: () => void` (called after the `DELETE`). Title (`* ` if pinned) is a button that edits in place: Enter saves, Esc cancels. `[ pin ]`/`[ unpin ]`, `[ archive ]`/`[ unarchive ]`, `[ delete ]`. Then type, id, tags (`TagsEditor`), pinned, archived, created, updated, and `PropsEditor`. Every save is one `PATCH` whose response replaces the object; server errors show inline. Ends with the `panels` section where 023/024 add one line each. `Esc` (unless an editor used it to cancel, via `preventDefault`) or `[ esc ] back` → `#/`; 404 → `object not found`. |
+| `src/objects/Detail.svelte` | Object page. Props: `id` (read once; Shell re-creates it per id), `ondeleted: () => void` (called after the `DELETE`). Title (`* ` if pinned) is a button that edits in place: Enter saves, Esc cancels. `[ pin ]`/`[ unpin ]`, `[ archive ]`/`[ unarchive ]`, `[ delete ]`. Then type, id, tags (`TagsEditor`), pinned, archived, created, updated, and `PropsEditor`. Every save is one `PATCH` whose response replaces the object; server errors show inline. Ends with the `panels` section: `Links`, `Comments`, `Attachments`. `Esc` (unless an editor used it to cancel, via `preventDefault`) or `[ esc ] back` → `#/`; 404 → `object not found`. |
+| `src/objects/Links.svelte` | Props: `id`. `links` (each `title type [ unlink ]`) and `backlinks` (`title type`); every title links to `#/o/<id>`; `no links`/`no backlinks` when empty. `[ link ]` opens the `id or title` prompt: Enter with a number sends the `PUT`; other text lists up to 10 matches from `findByTitle` (`no matches` if none), each a button that links it. Esc closes the prompt (with `preventDefault`). Success reloads the links; server errors show inline. |
+| `src/objects/Comments.svelte` | Props: `id`. Comments oldest first, each `<created> [ edit ] [ delete ]` over the body; `no comments` when empty. The `add comment` textarea: Ctrl+Enter or `[ add ]` posts it and clears it; Esc clears a non-empty one (with `preventDefault`). `[ edit ]` swaps the body for a focused textarea: Ctrl+Enter saves, Esc cancels (with `preventDefault`). `[ delete ]` deletes at once. Server errors (e.g. the 400 `body must be 1 to 10000 characters`) show inline and keep the draft. |
 | `src/objects/TagsEditor.svelte` | Props: `tags`, `onsave(tags): Promise<void>`. `#tag [ x ]` removes one; the `add tag` prompt (Enter) adds one; each sends the whole set; a rejection's message shows inline. Esc clears a non-empty prompt. |
 | `src/objects/PropsEditor.svelte` | Props: `properties`, `onsave(props): Promise<void>`. Shows `key: value` lines (non-strings as JSON) and `[ edit properties ]`, which opens a textarea; `[ save ]` or Ctrl+Enter saves, `[ cancel ]` or Esc cancels. A parse error (`line N: expected key: value`, `missing key`, `duplicate key "k"`) shows inline without sending. Module exports: `show(value)`, `formatProps(props)`, `parseValue(raw)` (integer/float, then `true`/`false`, else string, as CLI `--prop`), `parseProps(text, before)` (a line whose value text is unchanged keeps its old value, so arrays/`null`/numeric strings survive). |
 | `src/objects/Trash.svelte` | Trash view (no props) from `lib/trash.ts`: rows `title`, `type · deleted <day> · purges <day>`, `[ restore ]`, `[ delete forever ]` → `delete forever? [ yes ] [ no ]`; `[ empty trash ]` → `delete all <n> forever? [ yes ] [ no ]` (`[ no ]` gets focus). Results show as a note (`restored <title>`, `deleted <title> forever`, `deleted <n> forever`), failures as `error: <cause>`; `trash is empty` when empty. Esc cancels a pending confirm, else → `#/`. |
@@ -64,6 +66,22 @@ All built on `send`; failures throw `ApiError`.
 - `deleteAttachment(aid): Promise<void>` — `DELETE /api/attachments/{aid}`.
 - `downloadUrl(aid, inline = false): string` — `/api/attachments/{aid}`, plus `?inline=1` when `inline`.
 - `humanSize(bytes): string` — `512 B`, `5.0 KiB`, `1.2 MiB`, ... (as the CLI).
+
+## `src/lib/links.ts`
+All built on `send`; failures throw `ApiError`.
+- `type Summary = { id, type, title }`; `type Links = { links: Summary[], backlinks: Summary[] }` (each by title).
+- `getLinks(id): Promise<Links>` — `GET /api/objects/{id}/links`.
+- `addLink(id, to): Promise<void>` — `PUT /api/objects/{id}/links/{to}` (400 self-link, 404 unknown end).
+- `removeLink(id, to): Promise<void>` — `DELETE /api/objects/{id}/links/{to}` (404 `link not found`).
+- `MATCHES` (10); `findByTitle(query, self): Promise<Obj[]>` — one `listObjects({archived:'any', limit:1000})`, then the first `MATCHES` whose title contains the trimmed `query` ignoring case, `self` excluded.
+
+## `src/lib/comments.ts`
+All built on `send`; failures throw `ApiError` (400 `body must be 1 to 10000 characters`, 404).
+- `type Comment = { id, object_id, body, created, updated }` (RFC 3339).
+- `listComments(id): Promise<Comment[]>` — `GET /api/objects/{id}/comments`, unwrapped, oldest first.
+- `addComment(id, body): Promise<Comment>` — `POST /api/objects/{id}/comments`.
+- `editComment(cid, body): Promise<Comment>` — `PATCH /api/comments/{cid}`.
+- `deleteComment(cid): Promise<void>` — `DELETE /api/comments/{cid}`.
 
 ## Hash routes (Shell body)
 - `#/trash` → `Trash`.
