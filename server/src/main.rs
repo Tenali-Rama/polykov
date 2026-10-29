@@ -4,6 +4,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use polykov_server::config::{self, Flags};
+use polykov_server::db::Db;
 
 /// Polykov server.
 #[derive(Parser)]
@@ -38,6 +39,7 @@ async fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         web_dir: args.web_dir,
     };
     let cfg = config::load(flags, |key| std::env::var(key).ok())?;
+    let db = Db::open(&cfg.data_dir)?;
     let listener = tokio::net::TcpListener::bind(cfg.bind)
         .await
         .map_err(|e| format!("cannot bind {}: {e}", cfg.bind))?;
@@ -46,6 +48,6 @@ async fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         cfg.bind,
         cfg.data_dir.display()
     );
-    axum::serve(listener, polykov_server::app::router()).await?;
+    axum::serve(listener, polykov_server::app::router(db)).await?;
     Ok(())
 }
