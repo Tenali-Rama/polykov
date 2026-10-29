@@ -5,6 +5,7 @@
 ## Layout
 - `src/lib.rs`: crate `polykov_server`, used by the binary, `tests/`, and the CLI's tests.
 - `src/app.rs`: `router()` and the handlers. Add routes here (or in modules it mounts).
+- `src/config/`: data dir layout and settings (`config.toml` + env + flags). New settings go in `file.rs` (struct and `DEFAULT` template), `mod.rs` (merge), `main.rs` (flag) and `API.md`.
 - `src/main.rs`: argument parsing and port binding only. No app logic.
 - `tests/`: integration tests that drive `app::router()` with `tower::ServiceExt::oneshot`, no port needed.
 
