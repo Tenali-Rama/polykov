@@ -48,6 +48,6 @@ async fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         cfg.bind,
         cfg.data_dir.display()
     );
-    axum::serve(listener, polykov_server::app::router(db)).await?;
+    axum::serve(listener, polykov_server::app::router(db, &cfg.web_dir)).await?;
     Ok(())
 }

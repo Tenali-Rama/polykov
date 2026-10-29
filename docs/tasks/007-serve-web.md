@@ -2,7 +2,7 @@
 id: 007
 title: Serve the built web UI from the server with SPA fallback
 milestone: M0
-status: todo
+status: done
 deps: [002]
 touches: [server/src/web/, server/src/app.rs, server/Cargo.toml, Cargo.lock, server/tests/, server/API.md]
 spec: ["2. Architecture & Stack"]
@@ -25,4 +25,8 @@ spec: ["2. Architecture & Stack"]
 - Building the web app (006), caching headers tuning, compression, TLS.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `app::router` now takes `(db, web_dir: &Path)`; tests that don't care pass a dir with no `index.html` (one warning on stderr, harmless).
+- Static files use `tower-http` `ServeDir` + `ServeFile` fallback (its path validation rejects `..`, encoded separators and prefixes; rejected paths get `index.html`).
+- Whether the UI exists is decided once, when the router is built: if `index.html` was missing at start, restart after building the web app. With it present, rebuilt files are served live.
+- `/api`, `/api/*` and `/health/*` are reserved: unknown ones return `404 {"error":"not found"}` for any method. New API routes added via `.route` take precedence over the wildcard.
+- Non-GET/HEAD requests to web paths return `405`. No cache headers yet (out of scope).
