@@ -2,7 +2,7 @@
 id: 029
 title: Add the polykov-parse crate with the parser trait and a rules baseline
 milestone: M2
-status: todo
+status: done
 deps: []
 touches: [parse/, Cargo.toml, Cargo.lock, Dockerfile, docs/decisions/]
 spec: ["Capture", "5. Intelligence"]
@@ -37,4 +37,8 @@ A new workspace crate parses a smart-add line into a title plus typed tokens, be
 - The benchmark and the candidate comparison (030). HTTP endpoints (031).
 
 ## Notes for next
-<!-- builder fills in -->
+- All output types derive `Serialize` (`Kind`/`Anchor` lowercase), so 031 can return them as JSON directly. `Token` has no `resolved` field; 031 derives it from `Parsed`.
+- Defaults chosen: first value of a field wins (later duplicates are still tokens); `#`/`+`/`@` names must contain a letter (`#1`, `+1` stay text); `at N` is a 24-hour hour; `due/by <date>` may take a trailing time; an unpaired `"` is plain text.
+- `every <n>` without a unit, `next fri`, `tues`/`thurs`, `noon` are not recognised: candidates for 030's trap list.
+- Rules omit `INTERVAL` when it is 1 and order parts `FREQ;INTERVAL;BYDAY;BYMONTHDAY`, matching what 027's canonical `Display` should give.
+- chrono is `default-features = false, features = ["std"]` here; 025 adds `clock` for the server, and Cargo unifies them.
