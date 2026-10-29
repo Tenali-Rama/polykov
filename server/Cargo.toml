@@ -25,6 +25,7 @@ argon2 = { version = "0.5", features = ["std"] }
 getrandom = "0.3"
 sha2 = "0.10"
 tower-http = { version = "0.7", features = ["fs"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [dev-dependencies]
 http-body-util = "0.1"

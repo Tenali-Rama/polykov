@@ -21,6 +21,8 @@ Precedence: flag > env var > `<data dir>/config.toml` > default. An empty env va
 
 Tables (migration 4, all M1 data; times in Unix seconds; every side table cascades on delete of its object): `objects (id AUTOINCREMENT, type, title, properties JSON text default '{}', pinned, archived, created, updated, deleted_at NULL = live)`, `object_tags (object_id, tag)`, `links (src_id, dst_id, created)` (no self-links), `comments (id, object_id, body, created, updated)`, `attachments (id, object_id, name, mime, size, created)`. See ADR 0007.
 
+Tables (migration 5, all M2 data; ADR 0011): `tasks (object_id PK, status 'open'|'done', priority 1..4 default 4, scheduled, deadline, estimate minutes, someday, parent_id, project_id, section_id, area_id, checklist JSON default '[]', recurrence JSON NULL, completed)`, `projects (object_id PK, status 'active'|'someday'|'done', area_id, start, deadline)`, `sections (id AUTOINCREMENT, project_id, title, position, created)`. Dates are floating local TEXT (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`). The side rows cascade with their object; references to other objects or sections are `ON DELETE SET NULL`. Indexes: `tasks (parent_id | project_id | area_id | scheduled | deadline)`, `sections (project_id)`.
+
 Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no gaps) and append it to `MIGRATIONS` in `src/db/migrate.rs`. A test fails if the list and the dir disagree. Never edit a migration that has been merged.
 
 ## Library (`polykov_server`)
@@ -58,6 +60,10 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `trash::purge_expired(&Db, now_unix: i64) -> Result<usize, attachments::store::Error>`: deletes for good every object trashed more than `trash::store::RETENTION_SECS` (30 days) before `now_unix`, files first (`attachments::remove_files`), and returns how many. Live objects are never touched.
 - `trash::spawn_purger(Db) -> std::io::Result<()>`: starts a thread that runs `purge_expired` at start-up and then every `trash::PURGE_EVERY` (1 hour); a failed run logs one line. Called by `main.rs`.
 - `trash::store::{list(&Db) -> Result<Vec<Trashed>, db::Error>, restore(&Db, id) -> Result<Option<Object>, _>, purge(&Db, id) -> Result<bool, attachments::store::Error>, empty(&Db) -> Result<usize, _>}`: objects with `deleted_at` set. `Trashed` serializes to the object JSON plus `deleted` and `purge_at`.
+- `tasks::routes() -> Router<Db>`: the task routes below, merged by `app::router`.
+- `tasks::store::{create(&Db, &New) -> Result<Task, ApiError>, get(&Db, id) -> Result<Option<Task>, db::Error>, get_many(&Db, &[i64]) -> Result<Vec<Task>, db::Error>, update(&Db, id, &Changes) -> Result<Option<Task>, ApiError>, complete(&Db, id) -> Result<Option<Task>, db::Error>, reopen(&Db, id) -> Result<Option<Task>, db::Error>}`: live `task` objects joined with their `tasks` row (defaults when there is none). `get_many` returns the live tasks among the ids in the given order and skips the rest. `New { title, properties, pinned, tags, task: FieldChanges }` and `Changes { object: objects::store::Changes, task: FieldChanges }` need their object fields validated as for objects; the store checks every task rule itself (a broken one is `ApiError` `400`) and writes object and task row in one transaction. `FieldChanges` (also the `"task"` request body; all `Option`, `None` = unchanged, `Some(None)` clears) has `priority, scheduled, deadline, estimate, someday, parent_id, project_id, section_id, area_id, checklist`. `Task { object: Object, task: Fields }` serializes to the task JSON below.
+- `tasks::validate::{today() -> chrono::NaiveDate, priority, date, estimate, checklist, MAX_PRIORITY (4), MAX_ESTIMATE_MINUTES (10080), MAX_CHECKLIST_ITEMS (100), MAX_CHECKLIST_TEXT_CHARS (500)}`: the task value rules below; `today()` is the server's UTC date.
+- Dates: the server depends on `chrono` (default features off; `clock`, `std`). Use `chrono::NaiveDate`/`NaiveDateTime` for task dates and `tasks::validate::today()` for "today"; later tasks need no new date dependency.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
@@ -229,6 +235,37 @@ Deletes the object for good: its attachment files, then its row and its tags, li
 
 #### `DELETE /api/trash`
 Deletes every object in the trash for good. `200 {"purged":<n>}`.
+
+### Tasks
+All task routes require auth (`401` as in Authentication). A task is the object JSON (type `task`) plus its task fields:
+```json
+{"id":5,"type":"task","title":"Write copy",...,"task":{"status":"open","priority":4,"scheduled":null,"deadline":"2026-11-03T17:30","estimate":90,"someday":false,"parent_id":null,"project_id":2,"section_id":null,"area_id":null,"checklist":[{"text":"draft","done":false}],"recurrence":null,"completed":null}}
+```
+An object of type `task` made with `POST /api/objects` reads with these defaults. `completed` is RFC 3339 UTC, set while `status` is `done`. Rules, each failure a `400 {"error":"..."}`:
+- `priority`: 1 to 4, 1 highest; 4 means "no priority" (`priority must be 1 to 4`).
+- `scheduled`, `deadline`: a real date `YYYY-MM-DD` or a floating local time `YYYY-MM-DDTHH:MM`, no zone (`deadline must be a date YYYY-MM-DD or a local time YYYY-MM-DDTHH:MM`).
+- `estimate`: whole minutes, 1 to 10080 (`estimate must be 1 to 10080 minutes`).
+- `parent_id`: a live task (`parent must be a live task`), not the task itself or one of its sub-tasks (`a task cannot be its own ancestor`).
+- `project_id`: a live `project` (`project must be a live project`); `area_id`: a live `area` (`area must be a live area`).
+- `section_id`: a section of the task's project (`section is not in this project`). Setting a different `project_id` without `section_id` clears the section.
+- `checklist`: at most 100 items `{"text","done"}` (`done` defaults to `false`) (`checklist must have at most 100 items`); each `text` is trimmed, then 1 to 500 characters (`checklist text must be 1 to 500 characters`).
+
+`scheduled`, `deadline`, `estimate`, `parent_id`, `project_id`, `section_id` and `area_id` may be `null` (cleared); the others may not. Unknown fields (including `status`, `completed` and `recurrence` in a request) or a wrong JSON type get axum's standard `422`. A non-integer `{id}` gets `400`. An id that is unknown, in the trash or not a task gets `404 {"error":"task not found"}`.
+
+#### `POST /api/tasks`
+Body `{"title":"...","tags":[...],"properties":{...},"pinned":false,"task":{...}}`; all but `title` optional, `title`/`tags`/`properties` follow the object rules. `201` with the task.
+
+#### `GET /api/tasks/{id}`
+`200` with the task.
+
+#### `PATCH /api/tasks/{id}`
+Body with any of `title`, `properties`, `pinned`, `archived`, `tags` (as for objects) and `task` (any task fields). Any given field sets `updated` to now; `{}` changes nothing. `200` with the task.
+
+#### `POST /api/tasks/{id}/complete`
+Sets `status` to `done` and `completed` to now. `200 {"task":{...},"next":null}`. A task already done is left as it is (still `200`).
+
+#### `POST /api/tasks/{id}/reopen`
+Sets `status` to `open` and clears `completed`. `200` with the task.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 

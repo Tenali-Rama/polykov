@@ -2,7 +2,7 @@
 id: 025
 title: Add the M2 task schema and task create/get/update/complete API
 milestone: M2
-status: todo
+status: done
 deps: []
 touches: [server/migrations/0005_tasks.sql, server/src/db/migrate.rs+, server/src/tasks/, server/src/lib.rs+, server/src/app.rs+, server/Cargo.toml, Cargo.lock, server/tests/tasks.rs, server/tests/common/mod.rs, server/API.md, docs/decisions/]
 spec: ["3. Data Model", "Tasks (GTD)"]
@@ -41,4 +41,8 @@ The database holds every M2 table in one migration. The owner can create, read a
 - Goal/milestone, actual time and buffer fields: these come in M6, M8 and M9.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `tasks::store::{create, update}` check every task rule themselves (inside the write transaction) and return `ApiError`; callers only validate title/tags/properties. Build a `FieldChanges` directly (031) or deserialize it from a `"task"` body.
+- `PATCH /api/tasks/{id}` also takes the object fields (`title`, `properties`, `pinned`, `archived`, `tags`) so one call edits a whole task; `recurrence` is rejected as unknown (`422`) until 027 adds it to `FieldChanges`.
+- A task row is created lazily (first task write or complete); reads LEFT JOIN with defaults. Lists (026) must do the same `COALESCE`s as `store::select`, or collect ids and call `get_many`.
+- Reference rules run only for fields given in the request, so a task whose project was trashed can still be edited. Setting the same `project_id` again keeps the section.
+- `tasks::validate::today()` is the server's UTC "today" (ADR 0011); `complete` returns `"next":null` for 027 to fill.

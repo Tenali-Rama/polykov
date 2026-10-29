@@ -1,0 +1,6 @@
+# 0011 — Task and project fields
+
+- **Status**: accepted (amends 0007)
+- **Context**: M2 needs typed, indexed, referenced task and project fields (spec §3). `properties` JSON can't index or hold FKs, and ADR 0007 put type-specific fields on `objects`.
+- **Decision**: Type fields live in side tables keyed by the object id (`tasks`, `projects`; `sections` has its own id), created in one migration (0005) for all of M2. References use FKs to `objects` with `ON DELETE SET NULL`, while the side row cascades with its object. An object of that type with no side row reads with the defaults (LEFT JOIN) and gets its row on the first task write. `scheduled`/`deadline`/`start` are floating local dates (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`, no zone) stored as TEXT, so they sort as text and don't shift when the owner travels. "Today" is `chrono::Utc::now().date_naive()` until a time zone setting exists. Task status is `open`|`done`, project status is `active`|`someday`|`done`. P4 means "no priority".
+- **Consequences**: A task read never writes. New type fields are columns on the side table, not on `objects`. Don't store these dates as Unix seconds: they have no zone. Status changes only through complete/reopen, so `completed` stays consistent with `status`.

@@ -10,5 +10,6 @@ pub mod http;
 pub mod links;
 pub mod objects;
 pub mod tags;
+pub mod tasks;
 pub mod trash;
 pub mod web;
