@@ -1,4 +1,4 @@
-# 0010 — Smart add ships the tagger parser
+# 0012 — Smart add ships the tagger parser
 
 - **Status**: accepted
 - **Context**: Spec §5 picks each model by benchmark against a baseline. Task 030 compared the rules baseline, rules plus the `interim` date crate, and an averaged-perceptron token tagger (`docs/models/nl-parser.md`).
