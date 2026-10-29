@@ -1,4 +1,4 @@
-# 0005 — CLI HTTP client and token storage
+# 0006 — CLI HTTP client and token storage
 
 - **Status**: accepted
 - **Context**: Task 009 gives the CLI its server client and a place to keep the session token (spec §2, §9).
