@@ -15,7 +15,7 @@ use crate::{Context, Kind, Parsed, Parser, Token};
 pub struct RulesParser;
 
 /// What one token contributes.
-enum Hit {
+pub(crate) enum Hit {
     Date(NaiveDate),
     Time(NaiveTime),
     Duration(u32),
@@ -28,7 +28,7 @@ enum Hit {
 }
 
 impl Hit {
-    fn kind(&self) -> Kind {
+    pub(crate) fn kind(&self) -> Kind {
         match self {
             Hit::Date(_) => Kind::Date,
             Hit::Time(_) => Kind::Time,
@@ -46,8 +46,7 @@ impl Hit {
 impl Parser for RulesParser {
     fn parse(&self, input: &str, ctx: &Context) -> Parsed {
         let (words, quotes) = words::split(input);
-        let mut out = Parsed::default();
-        let mut acc = Values::default();
+        let mut hits = Vec::new();
         let mut i = 0;
         while i < words.len() {
             let len = words[i..]
@@ -62,21 +61,35 @@ impl Parser for RulesParser {
                 i += 1;
                 continue;
             };
-            let (start, end) = (words[i].start, words[i + n - 1].end);
-            out.tokens.push(Token {
-                start,
-                end,
-                kind: hit.kind(),
-                text: input[start..end].to_string(),
-            });
-            acc.apply(hit, &mut out);
+            hits.push((words[i].start, words[i + n - 1].end, hit));
             i += n;
         }
-        let day = acc.date.or(acc.first).or(acc.time.map(|_| ctx.today));
-        out.scheduled = day.map(|d| stamp(d, acc.time));
-        out.title = title(input, &out.tokens, &quotes);
-        out
+        assemble(input, ctx, &quotes, hits)
     }
+}
+
+/// Builds the result from the hits, in input order, as `(start, end, hit)` byte spans.
+pub(crate) fn assemble(
+    input: &str,
+    ctx: &Context,
+    quotes: &[usize],
+    hits: Vec<(usize, usize, Hit)>,
+) -> Parsed {
+    let mut out = Parsed::default();
+    let mut acc = Values::default();
+    for (start, end, hit) in hits {
+        out.tokens.push(Token {
+            start,
+            end,
+            kind: hit.kind(),
+            text: input[start..end].to_string(),
+        });
+        acc.apply(hit, &mut out);
+    }
+    let day = acc.date.or(acc.first).or(acc.time.map(|_| ctx.today));
+    out.scheduled = day.map(|d| stamp(d, acc.time));
+    out.title = title(input, &out.tokens, quotes);
+    out
 }
 
 /// The values that combine into `scheduled` once all tokens are known.
@@ -109,7 +122,7 @@ impl Values {
 }
 
 /// The first matcher that fits at the start of `run`, with the number of words it used.
-fn find(run: &Run, ctx: &Context) -> Option<(usize, Hit)> {
+pub(crate) fn find(run: &Run, ctx: &Context) -> Option<(usize, Hit)> {
     let today = ctx.today;
     if let Some((n, r)) = recur::repeat(run, today) {
         return Some((n, Hit::Recurrence(r)));

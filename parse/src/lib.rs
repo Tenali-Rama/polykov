@@ -1,15 +1,30 @@
 //! Smart-add parsing: one input line becomes a title plus typed tokens (spec §4 Capture, §5).
 //!
 //! Every parser sits behind [`Parser`], so candidates can be swapped. [`RulesParser`] is the
-//! hand-written baseline. The crate does no I/O.
+//! hand-written baseline; [`default_parser`] returns the benchmark winner. The crate does no
+//! I/O.
 
 mod rules;
+mod tagger;
 mod words;
 
 pub use rules::RulesParser;
+pub use tagger::{Labeled, TaggerParser};
 
 use chrono::NaiveDate;
 use serde::Serialize;
+
+/// The tagger model chosen by the 030 benchmark (`docs/models/nl-parser.md`).
+const MODEL: &[u8] = include_bytes!("tagger/model.bin");
+
+/// The parser smart add ships: the benchmark winner, [`TaggerParser`] with the bundled
+/// model. Falls back to [`RulesParser`] if the bundled model can't be read.
+pub fn default_parser() -> Box<dyn Parser> {
+    match TaggerParser::from_bytes(MODEL) {
+        Some(tagger) => Box::new(tagger),
+        None => Box::new(RulesParser),
+    }
+}
 
 /// Turns a smart-add line into a [`Parsed`] result. Never fails: text it doesn't understand
 /// stays in the title.

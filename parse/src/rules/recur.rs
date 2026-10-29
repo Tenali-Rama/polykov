@@ -8,7 +8,7 @@ use crate::{Anchor, Recurrence};
 
 /// A matched recurrence and its first occurrence on or after today.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Repeat {
+pub(crate) struct Repeat {
     pub recurrence: Recurrence,
     pub first: NaiveDate,
 }

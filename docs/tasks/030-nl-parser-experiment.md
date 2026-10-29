@@ -2,7 +2,7 @@
 id: 030
 title: Run the NL parser experiment and record the winner in docs/models
 milestone: M2
-status: todo
+status: done
 deps: [029]
 touches: [parse/bench/, parse/examples/bench.rs, parse/tests/bench.rs, parse/src/, parse/Cargo.toml, parse/API.md, Cargo.lock, docs/models/nl-parser.md]
 spec: ["5. Intelligence", "Capture"]
@@ -39,4 +39,8 @@ The parser that smart add ships is chosen by a benchmark, as spec §5 requires. 
 - Learning from the user's own corrections at runtime (the tagger is M11). HTTP endpoints (031).
 
 ## Notes for next
-<!-- builder fills in -->
+- Winner: `TaggerParser` (90.2% exact vs rules 89.0%); `default_parser()` returns it from the bundled `parse/src/tagger/model.bin`. Use `default_parser()` in 031, not `RulesParser`.
+- `date-crate` (rules + `interim`) lost at 80.4% and was deleted; numbers and why are in `docs/models/nl-parser.md`.
+- Re-run: `python3 parse/bench/gen.py`, `cargo run -p polykov-parse --release --example bench` (`-- --misses <name>` lists failures, `-- --save-model` retrains). Then update the doc and `RECORDED_EXACT` in `parse/tests/bench.rs`.
+- Remaining misses are loose forms the rules can't normalize (`thurs`, `noon`, `5 pm`, `30 mins`, `every other week`) and unseen traps (`buy sun lotion`). Adding those to the rules is the cheapest next gain; retrain after.
+- Latency is reported as p50/p99 over per-case medians of 20 runs, because the shared 2 vCPU host is noisy.
