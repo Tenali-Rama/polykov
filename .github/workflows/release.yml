@@ -18,15 +18,16 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - if: hashFiles('web/package.json') != ''
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: scripts/verify.sh
       - run: cargo build --release --workspace
-      - name: Package binaries
+      - run: npm --prefix web run build
+      - name: Package binaries and web UI
         run: |
           mkdir -p dist
+          tar -czf "dist/polykov-web-${GITHUB_REF_NAME}.tar.gz" -C web dist
           for b in polykov polykov-server; do
             [ -f "target/release/$b" ] && tar -czf "dist/$b-${GITHUB_REF_NAME}-linux-x86_64.tar.gz" -C target/release "$b"
           done

@@ -36,6 +36,23 @@ jobs:
           name: verify-logs
           path: .factory/logs/
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t polykov:ci .
+      - run: docker run -d --name polykov -p 127.0.0.1:7700:7700 polykov:ci
+      - name: Wait for /health ok (30 s)
+        run: |
+          SECONDS=0
+          while [ "$SECONDS" -lt 30 ]; do
+            if curl -fsS --max-time 2 http://127.0.0.1:7700/health | jq -e '.status == "ok"' >/dev/null 2>&1; then
+              echo "health ok after ${SECONDS}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::/health not ok after 30 s"; docker logs polykov; exit 1
+
   policy:
     runs-on: ubuntu-latest
     steps:

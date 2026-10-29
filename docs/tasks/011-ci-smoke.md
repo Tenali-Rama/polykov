@@ -2,7 +2,7 @@
 id: 011
 title: Wire CI fully with an end-to-end smoke test and Docker build
 milestone: M0
-status: todo
+status: done
 deps: [005, 008, 009, 010]
 touches: [scripts/verify.sh, scripts/smoke.sh, .github/workflows/]
 spec: ["10. Non-Functional", "2. Architecture & Stack"]
@@ -23,4 +23,7 @@ spec: ["10. Non-Functional", "2. Architecture & Stack"]
 - UI end-to-end browser tests (added with the first core UI flow in M2), coverage reporting, Android/desktop release jobs.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `scripts/smoke.sh` builds the debug binaries itself and needs `web/dist` (verify's `web-build` step runs first); it needs `curl`, `jq` and `python3` (free-port pick).
+- The smoke run isolates the CLI via temp `HOME`/`XDG_CONFIG_HOME` and `POLYKOV_SERVER`; add new end-to-end checks after the API-token check, each ending in `|| fail "<reason>"`.
+- CI `docker` job builds the image without layer caching; add buildx cache if it becomes the slowest job.
+- Release ships `polykov-web-<tag>.tar.gz` containing a top-level `dist/` dir; point `--web-dir` at the extracted `dist`.
