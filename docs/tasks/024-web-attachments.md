@@ -2,7 +2,7 @@
 id: 024
 title: Add the web attachments panel with upload, image preview, download and delete
 milestone: M1
-status: todo
+status: done
 deps: [016, 021]
 touches: [web/src/objects/Attachments.svelte, web/src/objects/Attachments.test.ts, web/src/lib/attachments.ts, web/src/lib/attachments.test.ts, web/src/objects/Detail.svelte+, web/API.md]
 spec: ["7. Clients & UI", "3. Data Model", "Tasks (GTD)"]
@@ -26,4 +26,8 @@ The object detail lists its attachments, and the owner can upload, preview image
 - Paste/drop images into the note editor (M4). Voice input (M11).
 
 ## Notes for next
-<!-- builder fills in -->
+- `humanSize` lives in `lib/attachments.ts` and matches the CLI's `human_size` format (`512 B`, `5.0 KiB`).
+- Uploads run one at a time in pick/drop order; the first failure stops the rest (the error names the server text).
+- Delete confirm cancels on Esc via `preventDefault`, so Detail's window Esc handler does not navigate away.
+- Thumbnails cover every `image/*`; the server only serves `inline` for non-SVG images, so an SVG thumbnail may not render.
+- The panel goes in Detail's `panels` section; 023 adds its line beside it (keep both on rebase).

@@ -10,6 +10,7 @@ function api(obj: Obj, more: Record<string, Route> = {}, reply?: (patch: Partial
   const patches: unknown[] = [];
   const fetch = stubApi({
     'GET /api/objects/7': () => Response.json(obj),
+    'GET /api/objects/7/attachments': () => Response.json({ attachments: [] }),
     'PATCH /api/objects/7': (_url, init) => {
       const patch = JSON.parse(String(init?.body)) as Partial<Obj>;
       patches.push(patch);
@@ -57,6 +58,7 @@ describe('detail', () => {
     expect(screen.getByText('store: corner')).toBeInTheDocument();
     expect(screen.getByText('list: ["milk",1]')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'panels' })).toBeInTheDocument();
+    expect(await screen.findByText('no attachments · drop files here')).toBeInTheDocument();
   });
 
   it('shows object not found on 404', async () => {
