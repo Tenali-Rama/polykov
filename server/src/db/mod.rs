@@ -18,6 +18,7 @@ pub const FILE_NAME: &str = "polykov.db";
 #[derive(Clone)]
 pub struct Db {
     conn: Arc<Mutex<Connection>>,
+    data_dir: Arc<PathBuf>,
 }
 
 impl Db {
@@ -34,7 +35,13 @@ impl Db {
         migrate::run(&mut conn)?;
         Ok(Db {
             conn: Arc::new(Mutex::new(conn)),
+            data_dir: Arc::new(data_dir.to_path_buf()),
         })
+    }
+
+    /// The data dir this database was opened in; feature modules keep their files under it.
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
     }
 
     /// Reads the schema version table, so a missing or unreadable schema fails; used by `/health`.

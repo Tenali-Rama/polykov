@@ -43,6 +43,10 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `objects::routes() -> Router<Db>`: the object routes below, merged by `app::router`.
 - `objects::store::{create(&Db, &New) -> Result<Object, db::Error>, get(&Db, id) -> Result<Option<Object>, _>, update(&Db, id, &Changes) -> Result<Option<Object>, _>, trash(&Db, id) -> Result<bool, _>}`: the `objects` table. Reads and writes only see live objects (`deleted_at IS NULL`). `New { type, title, properties, pinned, archived }` and `Changes` (all `Option`, `None` = unchanged) must already be validated with `objects::validate::{object_type, title, properties}`. `Object` serializes to the object JSON below.
 - `objects::store::summary(&Db, id) -> Result<Option<Summary>, db::Error>`: `Summary { id, type, title }` of a live object, `None` if unknown or in the trash. Links, comments and attachments use it to check their target.
+- `db::Db::data_dir(&self) -> &Path`: the data dir the database was opened in; feature modules keep their files under it.
+- `attachments::routes() -> Router<Db>`: the attachment routes below, merged by `app::router`.
+- `attachments::remove_files(&Db, object_id) -> Result<(), attachments::store::Error>`: deletes the files of every attachment of that object, live or in the trash, and leaves the rows (a permanent `DELETE FROM objects` cascades to them). A missing file is not an error. Call it before purging an object (task 017).
+- `attachments::store::{create, list, get, delete, file_path}`: the `attachments` rows plus `<data dir>/attachments/<id>` files. `create` writes `<id>.tmp`, syncs and renames it inside the row's transaction, so a failed write leaves no row. `store::Error` (`Db` or `Io(path, _)`) displays a one-line message and becomes a bare `500`. `attachments::{MAX_BYTES (25 MiB), MAX_NAME_CHARS (255)}`.
 - `objects::validate::{TYPES, MAX_TITLE_CHARS (1000), MAX_PROPERTIES (100), MAX_KEY_CHARS (64)}`: the object input rules below.
 - `links::routes() -> Router<Db>` and `comments::routes() -> Router<Db>`: the link and comment routes below, merged by `app::router`.
 - `links::store::{add(&Db, src, dst) -> Result<(), db::Error>, remove(&Db, src, dst) -> Result<bool, _>, list(&Db, id) -> Result<Links, _>}`: the `links` table. Callers check both ends with `objects::store::summary`. `Links { links, backlinks }` hold `Summary`s of live objects, by title.
@@ -167,6 +171,29 @@ Body `{"body":"..."}`. Replaces the body and sets `updated` to now. `200` with t
 `204`, empty body.
 
 For `PATCH` and `DELETE`, an unknown comment, or one on an object in the trash, gets `404 {"error":"comment not found"}`.
+
+### Attachments
+All attachment routes require auth (`401` as in Authentication). Files are stored as `<data dir>/attachments/<id>`; metadata in `attachments`. See ADR 0008. An attachment is:
+```json
+{"id":1,"object_id":7,"name":"résumé.pdf","mime":"application/pdf","size":5120,"created":"2026-10-29T09:15:00Z"}
+```
+A non-integer `{id}`/`{aid}` gets `400`. Unknown or trashed objects get `404 {"error":"object not found"}`; an unknown attachment, or one whose object is in the trash, gets `404 {"error":"attachment not found"}`.
+
+#### `POST /api/objects/{id}/attachments?name=<file name>`
+The body is the raw file (no multipart, no JSON). `mime` is the request `Content-Type` as sent, default `application/octet-stream`. `201` with the attachment.
+- `400 {"error":"name must be 1 to 255 characters with no slashes or control characters"}`: `name` missing, empty, over 255 characters (Unicode chars), or containing `/`, `\`, NUL or another control character.
+- `400 {"error":"Content-Type must be ASCII"}`: a `Content-Type` that is not visible ASCII.
+- `413 {"error":"attachment must be at most 25 MiB"}`: body over 26214400 bytes.
+- `500`: the file could not be written; no attachment is recorded.
+
+#### `GET /api/objects/{id}/attachments`
+`200 {"attachments":[...]}`, oldest first.
+
+#### `GET /api/attachments/{aid}[?inline=1]`
+`200` with the file bytes, `Content-Type: <mime>`, `Content-Disposition: attachment; filename*=UTF-8''<percent-encoded name>` and `X-Content-Type-Options: nosniff`. `?inline=1` sends `inline` instead, but only for `image/*` other than `image/svg+xml` (for `<img>` previews); otherwise it is ignored.
+
+#### `DELETE /api/attachments/{aid}`
+Deletes the row and the file. `204`, empty body.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 
