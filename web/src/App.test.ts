@@ -14,7 +14,8 @@ describe('health status', () => {
   it('shows the server version when /health is ok', async () => {
     const fetch = mockFetch(async () => Response.json({ status: 'ok', version: '0.1.0' }));
     render(App);
-    expect(await screen.findByText('server ok 0.1.0')).toBeInTheDocument();
+    const status = await screen.findByText('server ok 0.1.0');
+    expect(status).toHaveClass('ok');
     expect(fetch).toHaveBeenCalledWith('/health', expect.anything());
   });
 
@@ -23,7 +24,7 @@ describe('health status', () => {
       throw new TypeError('Failed to fetch');
     });
     render(App);
-    expect(await screen.findByText('server unreachable')).toBeInTheDocument();
+    expect(await screen.findByText('server unreachable')).toHaveClass('err');
   });
 
   it('shows unreachable on an error status', async () => {
