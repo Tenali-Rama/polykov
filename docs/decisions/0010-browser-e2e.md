@@ -1,4 +1,4 @@
-# 0009 — Browser e2e tests
+# 0010 — Browser e2e tests
 
 - **Status**: accepted
 - **Context**: Spec §10 asks for e2e UI tests. In M1, layout bugs (overflow at 360 px, targets under 44 px) passed jsdom tests and only showed up in a real browser.
