@@ -1,5 +1,6 @@
 //! Session store: random bearer tokens, kept in `sessions` only as a SHA-256 hash.
 
+use rusqlite::OptionalExtension;
 use sha2::{Digest, Sha256};
 
 use super::Error;
@@ -28,16 +29,32 @@ pub fn create(db: &Db) -> Result<String, Error> {
 
 /// Whether `token` belongs to a session that has not expired.
 pub fn is_valid(db: &Db, token: &str) -> Result<bool, Error> {
+    Ok(expires_at(db, token)?.is_some())
+}
+
+/// When the unexpired session for `token` expires, as RFC 3339 UTC
+/// (`YYYY-MM-DDTHH:MM:SSZ`), or `None` if `token` is unknown or expired.
+pub fn expires_at(db: &Db, token: &str) -> Result<Option<String>, Error> {
     let conn = db.conn()?;
-    let found = conn
-        .query_row(
-            "SELECT EXISTS (SELECT 1 FROM sessions \
-             WHERE token_hash = ?1 AND expires_at > unixepoch())",
-            [hash_token(token)],
-            |r| r.get(0),
-        )
-        .map_err(db::Error::Sqlite)?;
-    Ok(found)
+    conn.query_row(
+        "SELECT strftime('%Y-%m-%dT%H:%M:%SZ', expires_at, 'unixepoch') FROM sessions \
+         WHERE token_hash = ?1 AND expires_at > unixepoch()",
+        [hash_token(token)],
+        |r| r.get(0),
+    )
+    .optional()
+    .map_err(|e| db::Error::Sqlite(e).into())
+}
+
+/// Ends the session for `token`. Deleting an unknown token is not an error.
+pub fn delete(db: &Db, token: &str) -> Result<(), Error> {
+    let conn = db.conn()?;
+    conn.execute(
+        "DELETE FROM sessions WHERE token_hash = ?1",
+        [hash_token(token)],
+    )
+    .map_err(db::Error::Sqlite)?;
+    Ok(())
 }
 
 /// The value stored in `sessions.token_hash` for `token`: lowercase hex SHA-256.

@@ -1,8 +1,9 @@
 //! Owner setup, password login and session issuing (spec §9).
 //!
-//! Routes: `GET`/`POST /api/setup` and `POST /api/login`. Checking sessions on requests is
-//! built on [`session::is_valid`].
+//! Routes: `GET`/`POST /api/setup` and `POST /api/login` (public), `GET /api/me` and
+//! `POST /api/logout` (auth required). Routes require auth by taking a [`Session`] argument.
 
+mod extract;
 pub mod owner;
 pub mod password;
 pub mod session;
@@ -21,6 +22,8 @@ use serde_json::json;
 
 use crate::db::{self, Db};
 
+pub use extract::Session;
+
 /// Minimum owner password length, in characters.
 pub const MIN_PASSWORD_CHARS: usize = 12;
 
@@ -32,6 +35,8 @@ pub fn routes() -> Router<Db> {
     Router::new()
         .route("/api/setup", get(setup_needed).post(setup))
         .route("/api/login", post(login))
+        .route("/api/me", get(me))
+        .route("/api/logout", post(logout))
 }
 
 /// Request body of setup and login. No `Debug`, so the password cannot end up in a log line.
@@ -95,6 +100,20 @@ async fn login(State(db): State<Db>, Json(body): Json<PasswordBody>) -> Response
                 .into_response()
         }
         Ok(None) => StatusCode::UNAUTHORIZED.into_response(),
+        Err(code) => code.into_response(),
+    }
+}
+
+async fn me(current: Session) -> Json<serde_json::Value> {
+    Json(json!({ "owner": true, "session_expires": current.expires_at }))
+}
+
+async fn logout(State(db): State<Db>, current: Session) -> Response {
+    match blocking(move || session::delete(&db, &current.token)).await {
+        Ok(()) => {
+            let cookie = format!("{COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");
+            (StatusCode::NO_CONTENT, [(header::SET_COOKIE, cookie)]).into_response()
+        }
         Err(code) => code.into_response(),
     }
 }
