@@ -27,7 +27,7 @@ The object detail lists its attachments, and the owner can upload, preview image
 
 ## Notes for next
 - `humanSize` lives in `lib/attachments.ts` and matches the CLI's `human_size` format (`512 B`, `5.0 KiB`).
-- Uploads run one at a time in pick/drop order; the first failure stops the rest (the error names the server text).
-- Delete confirm cancels on Esc via `preventDefault`, so Detail's window Esc handler does not navigate away.
-- Thumbnails cover every `image/*`; the server only serves `inline` for non-SVG images, so an SVG thumbnail may not render.
-- The panel goes in Detail's `panels` section; 023 adds its line beside it (keep both on rebase).
+- Uploads run one at a time in pick/drop order; the first failure stops the rest, and a drop during an upload is ignored.
+- `.name` has `flex: 1 1 14ch; min-width: 14ch`, so the row metadata wraps under it at phone width (checked in headless Chromium at 360/412 px).
+- Delete confirm cancels on Esc via `preventDefault` (Detail stays) and refocuses the row's `[ delete ]`.
+- Thumbnails cover every `image/*`; the server only serves `inline` for non-SVG images, so an SVG thumbnail may not render. 023 adds its panel line beside ours (keep both on rebase).

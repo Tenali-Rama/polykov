@@ -120,6 +120,25 @@ describe('attachments', () => {
     expect(seen.map((s) => s.body)).toEqual(files);
   });
 
+  it('ignores a drop while an upload is running', async () => {
+    let finish: (res: Response) => void = () => {};
+    const posts: string[] = [];
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') return Response.json({ attachments: [] });
+      posts.push(url);
+      return new Promise<Response>((resolve) => (finish = resolve));
+    });
+    await open();
+    await choose([new File(['x'], 'slow.txt')]);
+    await screen.findByRole('status');
+    const panel = screen.getByRole('region', { name: 'attachments' });
+    await fireEvent.drop(panel, { dataTransfer: { files: [new File(['y'], 'late.txt')] } });
+    finish(Response.json(att(5, 'slow.txt', 'text/plain', 1), { status: 201 }));
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    expect(posts).toEqual(['/api/objects/7/attachments?name=slow.txt']);
+    expect(screen.queryByText('late.txt')).not.toBeInTheDocument();
+  });
+
   it('shows file too large on a 413', async () => {
     api({
       'POST /api/objects/7/attachments': () =>
@@ -156,18 +175,19 @@ describe('attachments', () => {
     ]);
   });
 
-  it('[ no ] and Esc cancel the delete without a request', async () => {
+  it('[ no ] and Esc cancel the delete without a request and refocus [ delete ]', async () => {
     const fetch = api();
     await open();
     await fireEvent.click(row('report.pdf').getByRole('button', { name: '[ delete ]' }));
     const no = row('report.pdf').getByRole('button', { name: '[ no ]' });
     expect(no).toHaveFocus();
     await fireEvent.click(no);
-    expect(row('report.pdf').getByRole('button', { name: '[ delete ]' })).toBeInTheDocument();
+    expect(row('report.pdf').getByRole('button', { name: '[ delete ]' })).toHaveFocus();
     await fireEvent.click(row('report.pdf').getByRole('button', { name: '[ delete ]' }));
     const esc = await fireEvent.keyDown(row('report.pdf').getByRole('button', { name: '[ no ]' }), { key: 'Escape' });
     expect(esc).toBe(false);
     expect(row('report.pdf').queryByText('delete report.pdf?')).not.toBeInTheDocument();
+    expect(row('report.pdf').getByRole('button', { name: '[ delete ]' })).toHaveFocus();
     expect(fetch.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
   });
 

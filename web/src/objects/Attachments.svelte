@@ -19,6 +19,8 @@
   let confirming = $state<number | null>(null);
   let dragging = $state(false);
   let picker: HTMLInputElement;
+  // The row whose `[ delete ]` takes focus back after a cancelled confirm.
+  let refocus: number | null = null;
 
   onMount(async () => {
     try {
@@ -64,6 +66,7 @@
   function ondrop(e: DragEvent) {
     e.preventDefault();
     dragging = false;
+    if (uploading !== '') return;
     const files = [...(e.dataTransfer?.files ?? [])];
     if (files.length > 0) void upload(files);
   }
@@ -80,12 +83,23 @@
     }
   }
 
+  function cancel() {
+    refocus = confirming;
+    confirming = null;
+  }
+
   /** Esc cancels a pending confirm; `preventDefault` keeps Detail from leaving the page. */
   function confirmKey(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.preventDefault();
-      confirming = null;
+      cancel();
     }
+  }
+
+  function focusIfRefocus(node: HTMLElement, aid: number) {
+    if (refocus !== aid) return;
+    refocus = null;
+    node.focus();
   }
 </script>
 
@@ -117,13 +131,17 @@
             <button type="button" onclick={() => remove(a)} onkeydown={confirmKey}>[ yes ]</button>
             <button
               type="button"
-              onclick={() => (confirming = null)}
+              onclick={cancel}
               onkeydown={confirmKey}
               {@attach (node) => node.focus()}>[ no ]</button
             >
           {:else}
             <a href={downloadUrl(a.id)} download={a.name}>[ download ]</a>
-            <button type="button" onclick={() => (confirming = a.id)}>[ delete ]</button>
+            <button
+              type="button"
+              onclick={() => (confirming = a.id)}
+              {@attach (node) => focusIfRefocus(node, a.id)}>[ delete ]</button
+            >
           {/if}
         </li>
       {/each}
@@ -169,9 +187,10 @@
   .rows li {
     border-bottom: 1px solid var(--line);
   }
+  /* A real basis: at phone width the size, mime and actions wrap under the name instead of squeezing it. */
   .name {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 14ch;
+    min-width: 14ch;
     overflow-wrap: anywhere;
   }
   .thumb {
