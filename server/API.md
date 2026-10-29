@@ -44,6 +44,9 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `objects::store::{create(&Db, &New) -> Result<Object, db::Error>, get(&Db, id) -> Result<Option<Object>, _>, update(&Db, id, &Changes) -> Result<Option<Object>, _>, trash(&Db, id) -> Result<bool, _>}`: the `objects` table. Reads and writes only see live objects (`deleted_at IS NULL`). `New { type, title, properties, pinned, archived }` and `Changes` (all `Option`, `None` = unchanged) must already be validated with `objects::validate::{object_type, title, properties}`. `Object` serializes to the object JSON below.
 - `objects::store::summary(&Db, id) -> Result<Option<Summary>, db::Error>`: `Summary { id, type, title }` of a live object, `None` if unknown or in the trash. Links, comments and attachments use it to check their target.
 - `objects::validate::{TYPES, MAX_TITLE_CHARS (1000), MAX_PROPERTIES (100), MAX_KEY_CHARS (64)}`: the object input rules below.
+- `links::routes() -> Router<Db>` and `comments::routes() -> Router<Db>`: the link and comment routes below, merged by `app::router`.
+- `links::store::{add(&Db, src, dst) -> Result<(), db::Error>, remove(&Db, src, dst) -> Result<bool, _>, list(&Db, id) -> Result<Links, _>}`: the `links` table. Callers check both ends with `objects::store::summary`. `Links { links, backlinks }` hold `Summary`s of live objects, by title.
+- `comments::store::{create(&Db, object_id, body) -> Result<Comment, db::Error>, list(&Db, object_id) -> Result<Vec<Comment>, _>, update(&Db, id, body) -> Result<Option<Comment>, _>, delete(&Db, id) -> Result<bool, _>}`: the `comments` table; comments on trashed objects are invisible to `update`/`delete`. `body` must already be trimmed and 1 to `comments::MAX_BODY_CHARS` (10000) characters. `Comment` serializes to the comment JSON below.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
@@ -128,6 +131,42 @@ Body with any of `title`, `properties`, `pinned`, `archived` (`type` cannot chan
 
 #### `DELETE /api/objects/{id}`
 Moves the object to the trash (sets `deleted_at`); it then gets `404` everywhere. `204`, empty body.
+
+### Links
+All link routes require auth (`401` as in Authentication). Links go from one object to another (spec §3); backlinks are the links pointing at an object. Both ids must be live objects, else `404 {"error":"object not found"}`; non-integer ids get `400`. Links to or from an object in the trash are hidden, and reappear when it is restored.
+
+#### `PUT /api/objects/{id}/links/{to}`
+Links `id` to `to`. `204`, empty body; linking again is a no-op `204`. `400 {"error":"cannot link an object to itself"}` when `id` = `to`.
+
+#### `DELETE /api/objects/{id}/links/{to}`
+Removes that link. `204`, empty body, or `404 {"error":"link not found"}`.
+
+#### `GET /api/objects/{id}/links`
+`200`, each side ordered by title:
+```json
+{"links":[{"id":2,"type":"task","title":"Write copy"}],"backlinks":[{"id":3,"type":"note","title":"Ideas"}]}
+```
+
+### Comments
+All comment routes require auth (`401` as in Authentication). A comment is:
+```json
+{"id":1,"object_id":2,"body":"looks good","created":"2026-10-29T09:15:00Z","updated":"2026-10-29T09:15:00Z"}
+```
+`body` is trimmed, then must be 1 to 10000 characters, else `400 {"error":"body must be 1 to 10000 characters"}`. Unknown fields or a missing `body` get axum's standard `422`.
+
+#### `POST /api/objects/{id}/comments`
+Body `{"body":"..."}`. `201` with the comment. An unknown or trashed object gets `404 {"error":"object not found"}`.
+
+#### `GET /api/objects/{id}/comments`
+`200 {"comments":[...]}`, oldest first. `404` as for `POST`.
+
+#### `PATCH /api/comments/{cid}`
+Body `{"body":"..."}`. Replaces the body and sets `updated` to now. `200` with the comment.
+
+#### `DELETE /api/comments/{cid}`
+`204`, empty body.
+
+For `PATCH` and `DELETE`, an unknown comment, or one on an object in the trash, gets `404 {"error":"comment not found"}`.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 

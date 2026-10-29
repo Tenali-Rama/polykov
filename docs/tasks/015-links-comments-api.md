@@ -2,7 +2,7 @@
 id: 015
 title: Add links with backlinks and comments on any object
 milestone: M1
-status: todo
+status: done
 deps: [013]
 touches: [server/src/links/, server/src/comments/, server/src/lib.rs+, server/src/app.rs+, server/tests/links.rs, server/tests/comments.rs, server/API.md]
 spec: ["3. Data Model", "Tasks (GTD)"]
@@ -25,4 +25,8 @@ Any object can link to any other object, backlinks are computed, and any object 
 - Wikilinks parsed from note text (M4). Comment mentions or markdown rendering.
 
 ## Notes for next
-<!-- builder fills in -->
+- Links store no state on trash: reads filter `deleted_at IS NULL`, so restore (017) needs no link work. Purge relies on the FK cascade.
+- Link `PUT`/`DELETE` check both ends are live (404 `object not found`); the self-link 400 is checked first, before any lookup.
+- Comment body error text: `body must be 1 to 10000 characters` (`comments::MAX_BODY_CHARS`).
+- Comments on trashed objects are hidden by joining to live objects in `comments::store`; PATCH/DELETE then give `comment not found`.
+- Tests simulate restore by clearing `deleted_at` in SQL until 017 lands.
