@@ -41,12 +41,15 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `http::ApiError` (`IntoResponse`): `ApiError::bad_request(msg)` / `not_found(msg)` (or `Client(status, msg)`) send `4xx {"error":"<msg>"}`; `Internal(cause)` logs one line and sends a bare `500`. `From<db::Error>` gives `Internal`. Feature-module handlers return `Result<_, ApiError>`.
 - `http::blocking(f) -> Result<T, ApiError>`: runs the store call `f: FnOnce() -> Result<T, E>` (`E: Into<ApiError>`) on Tokio's blocking pool; a panic becomes `Internal`.
 - `objects::routes() -> Router<Db>`: the object routes below, merged by `app::router`.
-- `objects::store::{create(&Db, &New) -> Result<Object, db::Error>, get(&Db, id) -> Result<Option<Object>, _>, update(&Db, id, &Changes) -> Result<Option<Object>, _>, trash(&Db, id) -> Result<bool, _>}`: the `objects` table. Reads and writes only see live objects (`deleted_at IS NULL`). `New { type, title, properties, pinned, archived }` and `Changes` (all `Option`, `None` = unchanged) must already be validated with `objects::validate::{object_type, title, properties}`. `Object` serializes to the object JSON below.
+- `objects::store::{create(&Db, &New) -> Result<Object, db::Error>, get(&Db, id) -> Result<Option<Object>, _>, update(&Db, id, &Changes) -> Result<Option<Object>, _>, trash(&Db, id) -> Result<bool, _>}`: the `objects` table. Reads and writes only see live objects (`deleted_at IS NULL`). `New { type, title, properties, pinned, archived, tags }` and `Changes` (all `Option`, `None` = unchanged; `tags` replaces the set) must already be validated with `objects::validate::{object_type, title, properties}` and `tags::normalize_all`. `Object` serializes to the object JSON below.
 - `objects::store::summary(&Db, id) -> Result<Option<Summary>, db::Error>`: `Summary { id, type, title }` of a live object, `None` if unknown or in the trash. Links, comments and attachments use it to check their target.
 - `db::Db::data_dir(&self) -> &Path`: the data dir the database was opened in; feature modules keep their files under it.
 - `attachments::routes() -> Router<Db>`: the attachment routes below, merged by `app::router`.
 - `attachments::remove_files(&Db, object_id) -> Result<(), attachments::store::Error>`: deletes the files of every attachment of that object, live or in the trash, and leaves the rows (a permanent `DELETE FROM objects` cascades to them). A missing file is not an error. Call it before purging an object (task 017).
 - `attachments::store::{create, list, get, delete, file_path}`: the `attachments` rows plus `<data dir>/attachments/<id>` files. `create` writes `<id>.tmp`, syncs and renames it inside the row's transaction, so a failed write leaves no row. `store::Error` (`Db` or `Io(path, _)`) displays a one-line message and becomes a bare `500`. `attachments::{MAX_BYTES (25 MiB), MAX_NAME_CHARS (255)}`.
+- `tags::routes() -> Router<Db>`: `GET /api/tags`, merged by `app::router`.
+- `tags::{normalize(&str) -> Result<String, ApiError>, normalize_all(&[String]) -> Result<Vec<String>, ApiError>, MAX_TAG_CHARS (100), MAX_TAGS (50)}`: the tag rules below; `normalize_all` also dedups and sorts.
+- `tags::store::{replace(&Connection, id, &[String]), counts(&Db) -> Result<Vec<Count>, _>, SORTED_JSON, under(param) -> String}`: the `object_tags` table. `replace` runs inside the caller's object-write transaction. `SORTED_JSON` and `under(n)` are SQL fragments over the `objects` row in scope (its sorted tags as a JSON array; "carries the tag bound to `?n` or one under it").
 - `objects::validate::{TYPES, MAX_TITLE_CHARS (1000), MAX_PROPERTIES (100), MAX_KEY_CHARS (64)}`: the object input rules below.
 - `links::routes() -> Router<Db>` and `comments::routes() -> Router<Db>`: the link and comment routes below, merged by `app::router`.
 - `links::store::{add(&Db, src, dst) -> Result<(), db::Error>, remove(&Db, src, dst) -> Result<bool, _>, list(&Db, id) -> Result<Links, _>}`: the `links` table. Callers check both ends with `objects::store::summary`. `Links { links, backlinks }` hold `Summary`s of live objects, by title.
@@ -115,23 +118,27 @@ Auth required. Revokes the token; it then gets `401` everywhere (a token may rev
 ### Objects
 All object routes require auth (`401` as in Authentication). An object (spec §3) is:
 ```json
-{"id":1,"type":"note","title":"Groceries","created":"2026-10-29T09:15:00Z","updated":"2026-10-29T09:15:00Z","archived":false,"pinned":false,"tags":[],"properties":{"aisle":3}}
+{"id":1,"type":"note","title":"Groceries","created":"2026-10-29T09:15:00Z","updated":"2026-10-29T09:15:00Z","archived":false,"pinned":false,"tags":["shop/food"],"properties":{"aisle":3}}
 ```
-Ids are integers that are never reused. `created`/`updated` are RFC 3339 UTC, to the second. `tags` is always `[]` for now (task 014). Rules, each failure a `400 {"error":"..."}`:
+Ids are integers that are never reused. `created`/`updated` are RFC 3339 UTC, to the second. `tags` is sorted. Rules, each failure a `400 {"error":"..."}`:
 - `type`: one of `task project area goal milestone habit note notebook journal_entry daily_note review event time_entry view forecast_record` (`type must be one of: task, project, ...`).
 - `title`: trimmed, then 1 to 1000 characters (`title must be 1 to 1000 characters`).
 - `properties`: a JSON object (`properties must be an object`; `null` included) of at most 100 keys (`properties must have at most 100 keys`), each 1 to 64 characters (`property names must be 1 to 64 characters`), whose values are a string, number, bool, null or an array of those (`property "<key>" must be a string, number, bool, null or an array of those`).
+- `tags`: an array of hierarchical tags (`work/clienta/design` lives in the folders `work` and `work/clienta`). Each is trimmed, one leading `#` is stripped and it is lowercased; the result is at most 100 characters of `/`-separated segments, each non-empty with no whitespace, `#` or `,` (`invalid tag: <input as sent>`). Duplicates after normalizing collapse into one; then at most 50 may remain (`an object can have at most 50 tags`).
 
-Unknown body fields, a missing required field, a wrong JSON type or an explicit `null` for `title`/`pinned`/`archived` get axum's standard `422`. A non-integer `{id}` gets `400`. An unknown id, or one in the trash, gets `404 {"error":"object not found"}`.
+Unknown body fields, a missing required field, a wrong JSON type or an explicit `null` for `title`/`pinned`/`archived`/`tags` get axum's standard `422`. A non-integer `{id}` gets `400`. An unknown id, or one in the trash, gets `404 {"error":"object not found"}`.
+
+#### `GET /api/objects`
+Query parameters, all optional: `type=<type>`, `tag=<tag>` (normalized like a tag; matches that tag and every tag under it: `tag=work` matches `work` and `work/clienta/design`, not `workshop`), `pinned=true|false`, `archived=false|true|any` (default `false`), `limit=1..1000` (default 100), `offset=<n ≥ 0>` (default 0). `200 {"objects":[...],"total":<n>}`: live objects only, pinned first, then `updated` newest first, then `id` highest first; `total` counts all matches regardless of paging. A bad value gets `400 {"error":"..."}` (e.g. `limit must be 1 to 1000`, `archived must be false, true or any`); an unknown parameter gets axum's standard `400`.
 
 #### `POST /api/objects`
-Body `{"type":"...","title":"...","properties":{...},"pinned":false,"archived":false}`; `properties` defaults to `{}`, the flags to `false`. `201` with the object.
+Body `{"type":"...","title":"...","properties":{...},"pinned":false,"archived":false,"tags":[...]}`; `properties` defaults to `{}`, the flags to `false`, `tags` to `[]`. `201` with the object.
 
 #### `GET /api/objects/{id}`
 `200` with the object.
 
 #### `PATCH /api/objects/{id}`
-Body with any of `title`, `properties`, `pinned`, `archived` (`type` cannot change). `properties` replaces the whole map. Any given field sets `updated` to now; `{}` changes nothing. `200` with the object.
+Body with any of `title`, `properties`, `pinned`, `archived`, `tags` (`type` cannot change). `properties` replaces the whole map and `tags` the whole set. Any given field sets `updated` to now; `{}` changes nothing. `200` with the object.
 
 #### `DELETE /api/objects/{id}`
 Moves the object to the trash (sets `deleted_at`); it then gets `404` everywhere. `204`, empty body.
@@ -194,6 +201,12 @@ The body is the raw file (no multipart, no JSON). `mime` is the request `Content
 
 #### `DELETE /api/attachments/{aid}`
 Deletes the row and the file. `204`, empty body.
+
+### `GET /api/tags`
+Auth required. `200` with every tag folder in use by a live, non-archived object, implicit parent folders included, sorted by tag; `count` is the number of such objects carrying that tag or one under it (each object once):
+```json
+{"tags":[{"tag":"work","count":2},{"tag":"work/clienta","count":1}]}
+```
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 

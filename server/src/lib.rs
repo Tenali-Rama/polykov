@@ -9,4 +9,5 @@ pub mod db;
 pub mod http;
 pub mod links;
 pub mod objects;
+pub mod tags;
 pub mod web;
