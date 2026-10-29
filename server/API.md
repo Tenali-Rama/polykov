@@ -33,19 +33,20 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `auth::session::is_valid(&Db, token: &str) -> Result<bool, auth::Error>`: whether `token` is a known, unexpired session.
 - `auth::session::expires_at(&Db, token: &str) -> Result<Option<String>, auth::Error>`: the unexpired session's expiry as RFC 3339 UTC (`YYYY-MM-DDTHH:MM:SSZ`), `None` if unknown or expired.
 - `auth::session::delete(&Db, token: &str) -> Result<(), auth::Error>`: ends that session; an unknown token is not an error.
-- `auth::Session { token: String, expires_at: String }`: Axum extractor (`FromRequestParts` for any state where `Db: FromRef<S>`) that resolves the caller's session. See Authentication.
+- `auth::Session { token: String, expires_at: Option<String> }` (`None` for an API token): Axum extractor (`FromRequestParts` for any state where `Db: FromRef<S>`) that resolves the caller's session. See Authentication.
+- `auth::tokens::{create(&Db, name) -> Result<(i64, String), auth::Error>, list(&Db) -> Result<Vec<tokens::Info>, _>, delete_by_id(&Db, id) -> Result<bool, _>, authenticate(&Db, token) -> Result<bool, _>}`: the API token store, `api_tokens (id, name, token_hash, created_at, last_used)` (Unix seconds, `last_used` NULL until first use). Tokens are made like session tokens and stored only as `session::hash_token`. `authenticate` records `last_used` on a hit. `Info { id, name, created, last_used: Option<_> }` (RFC 3339 UTC) never holds the token or hash. `tokens::MAX_NAME_CHARS` is 64.
 - `auth::owner::{exists, create, password_hash}` and `auth::password::{hash, verify}`: the single `owner` row and argon2id hashing (PHC strings). `auth::Error` displays a one-line message that never contains a password or token.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
 ### Authentication
-A request is authenticated by a session token, taken from `Authorization: Bearer <token>` (scheme case-insensitive) if that header is present, otherwise from the `polykov_session` cookie (`auth::COOKIE_NAME`). A present but malformed or invalid bearer header is rejected without looking at the cookie.
+A request is authenticated by a session token or an API token (see `/api/tokens`), taken from `Authorization: Bearer <token>` (scheme case-insensitive) if that header is present, otherwise from the `polykov_session` cookie (`auth::COOKIE_NAME`). A present but malformed or invalid bearer header is rejected without looking at the cookie.
 
 A route requires auth by taking `auth::Session` as a handler argument; that is the whole change:
 ```rust
 async fn handler(State(db): State<Db>, session: auth::Session) -> Response { ... }
 ```
-A missing, unknown or expired session gets `401 {"error":"authentication required"}` and the handler never runs; a store failure gets a bare `500`. Every route except `/health`, `GET`/`POST /api/setup`, `POST /api/login` and the web UI must take it.
+A missing, unknown, expired or revoked token gets `401 {"error":"authentication required"}` and the handler never runs; a store failure gets a bare `500`. Every route except `/health`, `GET`/`POST /api/setup`, `POST /api/login` and the web UI must take it.
 
 ### `GET /health`
 Public. `200` when the database answers:
@@ -72,10 +73,29 @@ Public. Body `{"password":"..."}`.
 - `401`, empty body and no cookie: wrong password, or no owner yet.
 
 ### `GET /api/me`
-Auth required. `200 {"owner":true,"session_expires":"<RFC 3339 UTC>"}`, e.g. `"2026-11-28T09:15:00Z"`. `401` as in Authentication.
+Auth required. `200 {"owner":true,"session_expires":"<RFC 3339 UTC>"}`, e.g. `"2026-11-28T09:15:00Z"`; `"session_expires":null` when called with an API token. `401` as in Authentication.
 
 ### `POST /api/logout`
-Auth required, no body. Deletes the caller's session (other sessions stay valid) and returns `204`, empty body, with `Set-Cookie: polykov_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`. The token then gets `401` everywhere. `401` as in Authentication, with no cookie change.
+Auth required, no body. Deletes the caller's session (other sessions stay valid) and returns `204`, empty body, with `Set-Cookie: polykov_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`. The token then gets `401` everywhere. Called with an API token it is a no-op (still `204`): API tokens are only revoked through `DELETE /api/tokens/{id}`. `401` as in Authentication, with no cookie change.
+
+### `POST /api/tokens`
+Auth required. Body `{"name":"..."}`. Creates a named API token that authenticates exactly like a session token (bearer header or cookie) but never expires. Names are trimmed and need not be unique.
+- `201 {"id":<integer>,"name":"<trimmed name>","token":"<64 hex chars>"}`. The plain token appears only in this response; only its SHA-256 hash is stored.
+- `400 {"error":"name must be 1 to 64 characters"}`: empty or whitespace-only name, or more than 64 characters (Unicode chars, not bytes) after trimming.
+- `401` as in Authentication.
+
+### `GET /api/tokens`
+Auth required. `200` with all API tokens, oldest first, never the token or its hash:
+```json
+[{"id":1,"name":"backup script","created":"2026-10-29T09:15:00Z","last_used":null}]
+```
+`last_used` (RFC 3339 UTC) is updated on every authenticated request made with the token; `null` until first use. `401` as in Authentication.
+
+### `DELETE /api/tokens/{id}`
+Auth required. Revokes the token; it then gets `401` everywhere (a token may revoke itself).
+- `204`, empty body: revoked.
+- `404 {"error":"token not found"}`: no token with that id. A non-integer id gets axum's standard `400`.
+- `401` as in Authentication.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 

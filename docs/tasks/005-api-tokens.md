@@ -2,7 +2,7 @@
 id: 005
 title: Add long-lived API tokens for scripts and clients
 milestone: M0
-status: todo
+status: done
 deps: [012]
 touches: [server/src/auth/, server/migrations/, server/src/app.rs, server/tests/, server/API.md]
 spec: ["9. Security & Self-Hosting"]
@@ -24,4 +24,8 @@ The owner can create, list and revoke named API tokens that authenticate exactly
 - Token scopes/permissions, a web UI for tokens (later milestone), CLI token commands (009 uses session login).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `auth::Session` now also accepts API tokens; `Session.expires_at` is `Option<String>` (`None` for an API token), and `/api/me` returns `"session_expires":null` for one.
+- Tokens use the session token format (64 hex) and `session::hash_token`; lookup tries `sessions` then `api_tokens` (ADR 0005).
+- Names are trimmed, must be 1-64 chars, and need not be unique; the id identifies a token.
+- `POST /api/logout` with an API token is a no-op; revoke only via `DELETE /api/tokens/{id}`.
+- Migration 0003 adds `api_tokens`; this needed an append-only line in `src/db/migrate.rs` (not in `touches`).
