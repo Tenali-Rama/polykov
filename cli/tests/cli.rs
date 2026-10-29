@@ -46,6 +46,9 @@ fn help_lists_implemented_subcommands_and_global_flags() {
             "unpin",
             "archive",
             "unarchive",
+            "link",
+            "comment",
+            "trash",
             "help"
         ]
     );

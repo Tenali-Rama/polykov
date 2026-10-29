@@ -16,6 +16,16 @@ Global flags (accepted before or after the subcommand):
 | `polykov edit <id> [--title T] [--add-tag T]... [--rm-tag T]... [--prop K=V]... [--unset K]...` | `GET`, merges the tags (`--rm-tag` is normalized like a tag) and properties, then one `PATCH` with only the changed fields. Prints `updated <id>`. | the object |
 | `polykov rm <id>` | `DELETE /api/objects/{id}` (to the trash). Prints `trashed <id>`. | `{"id":n,"trashed":true}` |
 | `polykov pin\|unpin\|archive\|unarchive <id>` | `PATCH` of `pinned`/`archived`. Prints e.g. `pinned <id>`, `unarchived <id>`. | the object |
+| `polykov link add\|rm <id> <to>` | `PUT`/`DELETE /api/objects/{id}/links/{to}`. Prints `linked <id> -> <to>` / `unlinked <id> -> <to>`. | `{"id":n,"to":n,"linked":true}` / `"unlinked":true` |
+| `polykov link ls <id>` | `GET /api/objects/{id}/links`. Prints `links:` and `backlinks:`, each followed by indented `<id>  <type>  <title>` lines, or `  none`. | the server body `{"links":[...],"backlinks":[...]}` |
+| `polykov comment add <id> <text>...` | `POST /api/objects/{id}/comments`; text words are joined with spaces. Prints `added comment <cid>`. | the comment |
+| `polykov comment ls <id>` | `GET /api/objects/{id}/comments`. Per comment, oldest first: `#<cid> <created>`, then the body with each line indented two spaces; or `no comments`. | the server body `{"comments":[...]}` |
+| `polykov comment edit <cid> <text>...` | `PATCH /api/comments/{cid}`. Prints `updated comment <cid>`. | the comment |
+| `polykov comment rm <cid>` | `DELETE /api/comments/{cid}`. Prints `deleted comment <cid>`. | `{"id":n,"deleted":true}` |
+| `polykov trash ls` | `GET /api/trash`. One line per object, newest deleted first: `<id>  <type>  <title>  deleted <YYYY-MM-DD>  purge <YYYY-MM-DD>`; or `trash is empty`. | the server body `{"objects":[...]}` |
+| `polykov trash restore <id>` | `POST /api/trash/{id}/restore`. Prints `restored <id>`. | the object |
+| `polykov trash purge <id>` | `DELETE /api/trash/{id}` (for good). Prints `purged <id>`. | `{"id":n,"purged":true}` |
+| `polykov trash empty --yes` | `DELETE /api/trash`. Prints `purged <n>`. Without `--yes`: clap error naming `--yes`, exit 2, no request. | `{"purged":n}` |
 
 `--prop K=V`: `V` becomes an integer or float, then `true`/`false`, else a string; a missing `=` or empty key exits 2. `<id>` must be a non-negative integer (else exit 2). Object errors from the server print as below, e.g. `polykov: server returned 404: object not found`.
 
@@ -42,7 +52,8 @@ Created with mode `0600`; an existing file keeps the mode its owner set. The tok
 - `error::Error`: `Unreachable`, `Unauthorized`, `Server`, `Msg(String)`; `Display` is the user-facing line.
 - `config`: `CliConfig { server, token }` with `load`/`save`/`token_for(server)`, `path(env)`, `resolve_server(flag, env, file)`, `env(name)`.
 - `cmd::Ctx { server, config, config_path }`: built once in `main`; `ctx.client()` is authenticated when a token is stored for `ctx.server`. `cmd::Output { human, json }` is what a command returns; `main` prints the one `--json` selects.
-- `cmd::object`: one file per object command (`new`, `show`, `ls`, `edit`, `rm`, `flag` for pin/archive) plus the shared rendering and `parse_prop` (the clap value parser for `--prop`) in `mod.rs`. Commands with flags take a `clap::Args` struct (`new::Args`, ...) that `main` embeds in its `Command` variant.
+- `cmd::object`: one file per object command (`new`, `show`, `ls`, `edit`, `rm`, `flag` for pin/archive) plus the shared rendering and `parse_prop` (the clap value parser for `--prop`) in `mod.rs`; `object::summary` (`<id>  <type>  <title>`) and `object::text` are reused by the other groups. Commands with flags take a `clap::Args` struct (`new::Args`, ...) that `main` embeds in its `Command` variant.
+- `cmd::link`, `cmd::comment`, `cmd::trash`: one file per command group, each a clap `Cmd` subcommand enum (one `#[command(subcommand)]` variant in `main`) and `run(ctx, cmd)`.
 
 ### Adding a subcommand
 1. Create `src/cmd/<name>.rs` with `pub fn run(ctx: &Ctx, ...) -> Result<Output, Error>`. Call the server via `ctx.client()`, and use `reply.ok()?` unless a status needs special handling.
