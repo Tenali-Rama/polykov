@@ -3,6 +3,8 @@
   import { ApiError } from '../lib/api';
   import { deleteObject, getObject, updateObject, type Obj, type Patch } from '../lib/objects';
   import Attachments from './Attachments.svelte';
+  import Comments from './Comments.svelte';
+  import Links from './Links.svelte';
   import PropsEditor from './PropsEditor.svelte';
   import TagsEditor from './TagsEditor.svelte';
   import { listHref } from './route';
@@ -134,6 +136,8 @@
 
     <!-- Panels: tasks 023 (links, comments) and 024 (attachments) each add one line here. -->
     <section class="panels" aria-label="panels">
+      <Links {id} />
+      <Comments {id} />
       <Attachments {id} />
     </section>
   {:else}
@@ -220,6 +224,9 @@
     margin: 0;
   }
   .panels:not(:empty) {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
     border-top: 1px solid var(--line);
     padding-top: 0.5rem;
   }
