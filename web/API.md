@@ -83,6 +83,10 @@ All built on `send`; failures throw `ApiError` (400 `body must be 1 to 10000 cha
 - `editComment(cid, body): Promise<Comment>` — `PATCH /api/comments/{cid}`.
 - `deleteComment(cid): Promise<void>` — `DELETE /api/comments/{cid}`.
 
+## `e2e/` (Playwright; run by `scripts/e2e.sh`)
+- `playwright.config.ts` — projects `phone` (360×740, mobile, touch) and `desktop` (1280×800), Chromium; `BASE_URL` from the env; every test starts logged in from the storage state that `e2e/global-setup.ts` saves (`STATE`). Opt out with `test.use({ storageState: { cookies: [], origins: [] } })`.
+- `helpers.ts`: `password()` (env `E2E_PASSWORD`), `uid()` (8 hex chars for unique titles), `login(page)` (login screen → shell), `api(page.request)` → `{ create(title, over?), link(from, to), comment(id, body), attach(id, name, mime, body), trash(id) }` (throws on non-2xx), `expectPhoneFit(page)` (throws, naming each element, on horizontal scroll or a visible `a, button, input, select, textarea, [role=button], [tabindex]` under 44×44 px), `tabTo(page, name)` (Tab until the focused element's accessible name is `name`; throws after 50 presses).
+
 ## Hash routes (Shell body)
 - `#/trash` → `Trash`.
 - `#/o/<id>` (positive integer) → `Detail`; `#/`, empty and any other hash → `List`. Shell follows `hashchange`, so browser back/forward works.

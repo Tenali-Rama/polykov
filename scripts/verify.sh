@@ -41,6 +41,7 @@ fi
 
 if [ -f Cargo.toml ] && [ -f web/package.json ]; then
   step smoke scripts/smoke.sh
+  step e2e scripts/e2e.sh
 fi
 
 if command -v gitleaks >/dev/null; then
