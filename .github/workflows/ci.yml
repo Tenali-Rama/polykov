@@ -29,12 +29,19 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - if: hashFiles('web/package.json') != ''
+        name: Install web deps and Chromium for e2e
+        run: |
+          npm --prefix web ci --no-audit --no-fund
+          cd web && npx playwright install --with-deps chromium
       - run: scripts/verify.sh
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: verify-logs
-          path: .factory/logs/
+          path: |
+            .factory/logs/
+            web/test-results/
 
   docker:
     runs-on: ubuntu-latest

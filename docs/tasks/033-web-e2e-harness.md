@@ -2,7 +2,7 @@
 id: 033
 title: Add a headless-browser e2e harness with 360 px phone checks
 milestone: M2
-status: todo
+status: done
 deps: []
 touches: [web/package.json, web/package-lock.json, web/playwright.config.ts, web/e2e/, web/eslint.config.js, web/tsconfig.json, web/CLAUDE.md, web/API.md, scripts/e2e.sh, scripts/verify.sh, .github/workflows/ci.yml, .gitignore, docs/decisions/]
 spec: ["10. Non-Functional", "7. Clients & UI", "8. Customization & Accessibility"]
@@ -37,4 +37,8 @@ Core UI flows run in a real headless Chromium against the real server, as spec Â
 - Tauri/Android device tests (M13/M14).
 
 ## Notes for next
-<!-- builder fills in -->
+- Run one spec: `scripts/e2e.sh --project phone m1` (extra args go to `playwright test`). Logins wait 30 s: argon2 in the debug server takes seconds under parallel load.
+- `expectPhoneFit` compares against the configured viewport width, not `innerWidth`: mobile Chromium widens `innerWidth` to fit overflowing content, which hides the scroll.
+- Phone-fit fixmes on today's UI (follow-ups): list `pinned only` checkbox 13Ã—13 and `trash` link 38 px wide; detail tag `[ x ]` 38 px wide. Login and trash fit.
+- After 037 focuses the command input on login, the keyboard flow still works: it Tabs to the first row before `j`/`k`.
+- `vitest run --dir src` keeps Vitest away from `e2e/*.spec.ts`; tsconfig types now include `node` for the e2e files.
