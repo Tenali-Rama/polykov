@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Git commit-msg hook: commits are authored by the owner only, with no AI attribution lines.
+set -euo pipefail
+want="tenalirama.krishna125@gmail.com"
+email=$(git var GIT_AUTHOR_IDENT | sed -E 's/.*<([^>]*)>.*/\1/')
+if [ "$email" != "$want" ]; then
+  echo "commit-msg: author must be <$want>, got <$email>" >&2
+  exit 1
+fi
+clean=$(grep -viE 'co-authored-by:.*(claude|anthropic)|generated with \[?claude' "$1" || true)
+printf '%s\n' "$clean" >"$1"
