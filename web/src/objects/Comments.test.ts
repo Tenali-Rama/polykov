@@ -88,6 +88,21 @@ describe('comments panel', () => {
     expect(input).toHaveValue('  ');
   });
 
+  it('Esc in a non-empty prompt clears it and marks the key handled; an empty prompt lets it through', async () => {
+    const { bodies } = api([]);
+    const input = await open();
+    await fireEvent.input(input, { target: { value: 'unsent draft' } });
+    const esc = () => new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    const first = esc();
+    input.dispatchEvent(first);
+    expect(first.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(input).toHaveValue(''));
+    const second = esc();
+    input.dispatchEvent(second);
+    expect(second.defaultPrevented).toBe(false);
+    expect(bodies).toEqual([]);
+  });
+
   it('edits inline: Ctrl+Enter saves with one PATCH', async () => {
     const { bodies } = api([comment(1, 'frist')]);
     await open();

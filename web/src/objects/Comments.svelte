@@ -72,6 +72,10 @@
     if (e.key === 'Enter' && e.ctrlKey) {
       e.preventDefault();
       add();
+    } else if (e.key === 'Escape' && draft !== '') {
+      // Like TagsEditor: a non-empty prompt claims Esc and clears, so Detail stays open.
+      e.preventDefault();
+      draft = '';
     }
   }
 

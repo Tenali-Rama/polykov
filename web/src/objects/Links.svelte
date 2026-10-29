@@ -158,6 +158,9 @@
     min-height: 44px;
   }
   a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     color: inherit;
   }
   button {
