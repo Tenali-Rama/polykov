@@ -1,8 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { logout, serverVersion } from './lib/api';
+  import Detail from './objects/Detail.svelte';
+  import List from './objects/List.svelte';
+  import { parseHash } from './objects/route';
 
   let { onlogout }: { onlogout: () => void } = $props();
+
+  let route = $state(parseHash(location.hash));
 
   let status = $state('server …');
   let ok = $state<boolean | null>(null);
@@ -27,6 +32,8 @@
   });
 </script>
 
+<svelte:window onhashchange={() => (route = parseHash(location.hash))} />
+
 <main class="shell">
   <header class="bar">
     <span>polykov</span>
@@ -36,7 +43,11 @@
   {#if logoutError}<p class="err" role="alert">{logoutError}</p>{/if}
 
   <section class="body">
-    <p class="dim">nothing here yet</p>
+    {#if route.view === 'detail'}
+      {#key route.id}<Detail id={route.id} />{/key}
+    {:else}
+      <List />
+    {/if}
   </section>
 
   <form class="prompt" onsubmit={(e) => e.preventDefault()}>
@@ -104,10 +115,6 @@
   .body {
     flex: 1;
     padding: 0.75rem;
-  }
-  .dim {
-    color: var(--dim);
-    margin: 0;
   }
   .prompt {
     display: flex;

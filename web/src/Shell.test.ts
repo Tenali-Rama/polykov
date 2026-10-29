@@ -1,16 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import Shell from './Shell.svelte';
+import { makeObj, stubApi } from './objects/testing';
 
 const props = { onlogout: () => {} };
 
+/** `impl` answers everything except the object list body calls, which return empty results. */
 function mockFetch(impl: (path?: string) => Promise<Response>) {
-  const fn = vi.fn(impl);
+  const fn = vi.fn(async (path?: string) => {
+    if (path?.startsWith('/api/objects')) return Response.json({ objects: [], total: 0 });
+    if (path === '/api/tags') return Response.json({ tags: [] });
+    return impl(path);
+  });
   vi.stubGlobal('fetch', fn);
   return fn;
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  location.hash = '';
+});
 
 describe('health status', () => {
   it('shows the server version when /health is ok', async () => {
@@ -59,5 +68,37 @@ describe('logout', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'logout' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('logout failed: /api/logout: HTTP 500');
     expect(onlogout).not.toHaveBeenCalled();
+  });
+});
+
+describe('hash routes', () => {
+  const routes = {
+    'GET /health': () => Response.json({ status: 'ok', version: '0.1.0' }),
+    'GET /api/tags': () => Response.json({ tags: [] }),
+    'GET /api/objects': () => Response.json({ objects: [makeObj(4, { title: 'Listed' })], total: 1 }),
+    'GET /api/objects/4': () => Response.json(makeObj(4, { title: 'Opened' })),
+  };
+
+  it('shows the list on an unknown hash', async () => {
+    stubApi(routes);
+    location.hash = '#/nope';
+    render(Shell, { props });
+    expect(await screen.findByRole('link', { name: /Listed/ })).toBeInTheDocument();
+  });
+
+  it('shows the detail on #/o/<id> and follows hash changes back and forth', async () => {
+    stubApi(routes);
+    location.hash = '#/o/4';
+    render(Shell, { props });
+    expect(await screen.findByRole('heading', { name: 'Opened' })).toBeInTheDocument();
+
+    location.hash = '#/';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(await screen.findByRole('link', { name: /Listed/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Opened' })).not.toBeInTheDocument();
+
+    location.hash = '#/o/4';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(await screen.findByRole('heading', { name: 'Opened' })).toBeInTheDocument();
   });
 });

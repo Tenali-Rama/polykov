@@ -2,7 +2,7 @@
 id: 021
 title: Add the web object list with tag folders, filters, create and a read-only detail
 milestone: M1
-status: todo
+status: done
 deps: [014]
 touches: [web/src/lib/api.ts, web/src/lib/api.test.ts, web/src/lib/objects.ts, web/src/lib/objects.test.ts, web/src/objects/, web/src/Shell.svelte, web/src/Shell.test.ts, web/API.md]
 spec: ["7. Clients & UI", "Organization", "3. Data Model"]
@@ -32,4 +32,8 @@ After logging in, the shell body shows the owner's objects with tag-folder and f
 - The command palette and capture bar (M2/M3).
 
 ## Notes for next
-<!-- builder fills in -->
+- Panels: add one `<Component id={obj.id} />` line each inside `<section class="panels">` at the end of `objects/Detail.svelte` (023, 024).
+- Detail reads `id` once; Shell wraps it in `{#key route.id}`. Esc and `[ esc ] back` set `#/` (a new history entry, not `history.back()`).
+- List filters live in `List.svelte` state, so they reset when returning from a detail. Lift them to a module store if 022 needs them kept.
+- Page shortcuts ignore keys from controls via `route.ts` `ownsKeys`; reuse it for new shortcuts (Ctrl+K etc. in M2).
+- `objects/testing.ts` has `stubApi`/`urls`/`makeObj` for web tests that need a fake server.
