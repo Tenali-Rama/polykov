@@ -1,3 +1,4 @@
-//! Polykov server library: the HTTP app, shared by the binary and by tests.
+//! Polykov server library: the HTTP app and its config, shared by the binary and by tests.
 
 pub mod app;
+pub mod config;
