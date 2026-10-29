@@ -49,6 +49,7 @@ fn help_lists_implemented_subcommands_and_global_flags() {
             "link",
             "comment",
             "trash",
+            "attach",
             "help"
         ]
     );

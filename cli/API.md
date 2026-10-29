@@ -26,6 +26,7 @@ Global flags (accepted before or after the subcommand):
 | `polykov trash restore <id>` | `POST /api/trash/{id}/restore`. Prints `restored <id>`. | the object |
 | `polykov trash purge <id>` | `DELETE /api/trash/{id}` (for good). Prints `purged <id>`. | `{"id":n,"purged":true}` |
 | `polykov trash empty --yes` | `DELETE /api/trash`. Prints `purged <n>`. Without `--yes`: clap error naming `--yes`, exit 2, no request. | `{"purged":n}` |
+| `polykov attach add <id> <file> [--name N]` / `ls <id>` / `get <aid> [-o PATH] [--force]` / `rm <aid>` | `add` reads the file first (`cannot read <file>: <cause>`, no request), then `POST /api/objects/{id}/attachments?name=` (the file's basename by default) with a `Content-Type` from the local file's extension, even with `--name` (`application/octet-stream` if unknown); prints `attached <aid>`. `ls` prints `<aid>  <name>  <size>  <mime>` per line (`512 B`, `5.0 KiB`, ...) or `no attachments`. `get` writes to `PATH`, else to the `Content-Disposition` name in the current dir; an existing file exits 1 (`<path> exists; use --force to overwrite`) unless `--force`. Prints `wrote <path> (<size>)`. `rm` prints `removed <aid>`. | `add`: the attachment; `ls`: `{"attachments":[...]}`; `get`: `{"id","path","size"}`; `rm`: `{"id":n,"deleted":true}` |
 
 `--prop K=V`: `V` becomes an integer or float, then `true`/`false`, else a string; a missing `=` or empty key exits 2. `<id>` must be a non-negative integer (else exit 2). Object errors from the server print as below, e.g. `polykov: server returned 404: object not found`.
 
@@ -49,11 +50,13 @@ Created with mode `0600`; an existing file keeps the mode its owner set. The tok
 - `client::Client::new(server, token: Option<&str>)`: blocking HTTP client (`ureq`, 10 s timeout) that sends `Authorization: Bearer <token>` when given one.
   - `get(path)` / `delete(path)` / `post(path, body: Option<&Value>)` / `put(path, body: Option<&Value>)` / `patch(path, body: &Value)` → `Result<Reply, Error>`. `path` includes any query string, already percent-encoded. Every HTTP status is a `Reply { status, body }` (`body` is `Null` if not JSON); only transport failures are `Error::Unreachable`.
   - `Reply::ok()` → the body of a `2xx`, `Error::Unauthorized` on `401`, else `Error::Server`.
+  - `post_bytes(path, content_type, bytes: &[u8])` → `Result<Reply, Error>`: a raw body upload with a JSON reply. `get_bytes(path)` → `Result<BytesReply { status, headers, bytes }, Error>` (bodies up to 26 MiB); `BytesReply::ok()` keeps a `2xx` and maps other statuses like `Reply::ok`.
 - `error::Error`: `Unreachable`, `Unauthorized`, `Server`, `Msg(String)`; `Display` is the user-facing line.
 - `config`: `CliConfig { server, token }` with `load`/`save`/`token_for(server)`, `path(env)`, `resolve_server(flag, env, file)`, `env(name)`.
 - `cmd::Ctx { server, config, config_path }`: built once in `main`; `ctx.client()` is authenticated when a token is stored for `ctx.server`. `cmd::Output { human, json }` is what a command returns; `main` prints the one `--json` selects.
-- `cmd::object`: one file per object command (`new`, `show`, `ls`, `edit`, `rm`, `flag` for pin/archive) plus the shared rendering and `parse_prop` (the clap value parser for `--prop`) in `mod.rs`; `object::summary` (`<id>  <type>  <title>`) and `object::text` are reused by the other groups. Commands with flags take a `clap::Args` struct (`new::Args`, ...) that `main` embeds in its `Command` variant.
+- `cmd::object`: one file per object command (`new`, `show`, `ls`, `edit`, `rm`, `flag` for pin/archive) plus the shared rendering and `parse_prop` (the clap value parser for `--prop`) in `mod.rs`; `object::summary` (`<id>  <type>  <title>`) and `object::text` are reused by the other groups. Commands with flags take a `clap::Args` struct (`new::Args`, ...) that `main` embeds in its `Command` variant. `object::ls::encode` percent-encodes a query value.
 - `cmd::link`, `cmd::comment`, `cmd::trash`: one file per command group, each a clap `Cmd` subcommand enum (one `#[command(subcommand)]` variant in `main`) and `run(ctx, cmd)`.
+- `cmd::attach`: the `attach` command group, a `clap::Subcommand` enum `attach::Command` dispatched by `attach::run`.
 
 ### Adding a subcommand
 1. Create `src/cmd/<name>.rs` with `pub fn run(ctx: &Ctx, ...) -> Result<Output, Error>`. Call the server via `ctx.client()`, and use `reply.ok()?` unless a status needs special handling.
