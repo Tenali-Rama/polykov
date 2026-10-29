@@ -2,7 +2,7 @@
   import { listObjects, TYPES, type Archived, type Filter, type Obj } from '../lib/objects';
   import CreateForm from './CreateForm.svelte';
   import TagTree from './TagTree.svelte';
-  import { objectHref, ownsKeys } from './route';
+  import { objectHref, ownsKeys, trashHref } from './route';
 
   const PAGE = 50;
 
@@ -92,6 +92,7 @@
           <option value="any">any</option>
         </select>
       </label>
+      <a class="trashlink" href={trashHref}>trash</a>
     </div>
 
     {#if error}<p class="err" role="alert">{error}</p>{/if}
@@ -150,6 +151,16 @@
     align-items: center;
     gap: 0.5ch;
     min-height: 44px;
+  }
+  .trashlink {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-left: auto;
+    color: var(--dim);
+  }
+  .trashlink:hover {
+    color: var(--fg);
   }
   select,
   .more {

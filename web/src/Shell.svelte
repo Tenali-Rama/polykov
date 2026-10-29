@@ -3,11 +3,24 @@
   import { logout, serverVersion } from './lib/api';
   import Detail from './objects/Detail.svelte';
   import List from './objects/List.svelte';
-  import { parseHash } from './objects/route';
+  import Trash from './objects/Trash.svelte';
+  import { listHref, parseHash } from './objects/route';
 
   let { onlogout }: { onlogout: () => void } = $props();
 
   let route = $state(parseHash(location.hash));
+  // One-line note above the list (e.g. after a delete); cleared once the route leaves the list.
+  let note = $state('');
+
+  function onhashchange() {
+    route = parseHash(location.hash);
+    if (route.view !== 'list') note = '';
+  }
+
+  function deleted() {
+    note = 'moved to trash';
+    location.hash = listHref;
+  }
 
   let status = $state('server …');
   let ok = $state<boolean | null>(null);
@@ -32,7 +45,7 @@
   });
 </script>
 
-<svelte:window onhashchange={() => (route = parseHash(location.hash))} />
+<svelte:window {onhashchange} />
 
 <main class="shell">
   <header class="bar">
@@ -44,8 +57,11 @@
 
   <section class="body">
     {#if route.view === 'detail'}
-      {#key route.id}<Detail id={route.id} />{/key}
+      {#key route.id}<Detail id={route.id} ondeleted={deleted} />{/key}
+    {:else if route.view === 'trash'}
+      <Trash />
     {:else}
+      {#if note}<p class="note" role="status">{note}</p>{/if}
       <List />
     {/if}
   </section>
@@ -111,6 +127,10 @@
   p.err {
     margin: 0;
     color: var(--err);
+  }
+  p.note {
+    margin: 0 0 0.5rem;
+    color: var(--ok);
   }
   .body {
     flex: 1;
