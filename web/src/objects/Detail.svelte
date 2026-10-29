@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '../lib/api';
   import { deleteObject, getObject, updateObject, type Obj, type Patch } from '../lib/objects';
+  import Attachments from './Attachments.svelte';
   import PropsEditor from './PropsEditor.svelte';
   import TagsEditor from './TagsEditor.svelte';
   import { listHref } from './route';
@@ -132,7 +133,9 @@
     <PropsEditor properties={o.properties} onsave={(properties) => save({ properties })} />
 
     <!-- Panels: tasks 023 (links, comments) and 024 (attachments) each add one line here. -->
-    <section class="panels" aria-label="panels"></section>
+    <section class="panels" aria-label="panels">
+      <Attachments {id} />
+    </section>
   {:else}
     <p class="dim">loading …</p>
   {/if}

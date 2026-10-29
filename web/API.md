@@ -14,6 +14,7 @@
 | `src/objects/TagsEditor.svelte` | Props: `tags`, `onsave(tags): Promise<void>`. `#tag [ x ]` removes one; the `add tag` prompt (Enter) adds one; each sends the whole set; a rejection's message shows inline. Esc clears a non-empty prompt. |
 | `src/objects/PropsEditor.svelte` | Props: `properties`, `onsave(props): Promise<void>`. Shows `key: value` lines (non-strings as JSON) and `[ edit properties ]`, which opens a textarea; `[ save ]` or Ctrl+Enter saves, `[ cancel ]` or Esc cancels. A parse error (`line N: expected key: value`, `missing key`, `duplicate key "k"`) shows inline without sending. Module exports: `show(value)`, `formatProps(props)`, `parseValue(raw)` (integer/float, then `true`/`false`, else string, as CLI `--prop`), `parseProps(text, before)` (a line whose value text is unchanged keeps its old value, so arrays/`null`/numeric strings survive). |
 | `src/objects/Trash.svelte` | Trash view (no props) from `lib/trash.ts`: rows `title`, `type · deleted <day> · purges <day>`, `[ restore ]`, `[ delete forever ]` → `delete forever? [ yes ] [ no ]`; `[ empty trash ]` → `delete all <n> forever? [ yes ] [ no ]` (`[ no ]` gets focus). Results show as a note (`restored <title>`, `deleted <title> forever`, `deleted <n> forever`), failures as `error: <cause>`; `trash is empty` when empty. Esc cancels a pending confirm, else → `#/`. |
+| `src/objects/Attachments.svelte` | Attachments panel in `Detail`'s `panels` section. Props: `id`. Rows `<thumb> name size mime` (`humanSize`; a thumbnail from `?inline=1` for `image/*`), `[ download ]` (link to `/api/attachments/<aid>`), `[ delete ]` → `delete <name>? [ yes ] [ no ]` (`[ no ]` gets focus; Esc or `[ no ]` cancels, with `preventDefault`, and refocuses that row's `[ delete ]`). `no attachments · drop files here` when empty. `[ attach ]` opens a file picker (multiple); files picked or dropped on the panel upload one request each, in order, with `uploading <name>…`; the first failure stops the rest; a drop during an upload is ignored. At phone width the size, mime and actions wrap under the name (`min-width: 14ch`). Errors show inline: 413 → `file too large (max 25 MiB)`, else the server text. |
 | `src/objects/testing.ts` | Test helpers: `stubApi(routes)` (fake `fetch` keyed `METHOD path`, query ignored, unknown → 599), `urls(fn, prefix)`, `makeObj(id, over)`. |
 | `src/auth/Setup.svelte` | First-run screen: `password` + `confirm`. Inline errors as you type: `password must be at least 12 characters` (Unicode chars), `passwords do not match`; both forced on submit. Server 400/409 `error` text shown as-is. Props: `ondone`. |
 | `src/auth/Login.svelte` | Login screen: `password`; 401 → `wrong password`. Props: `ondone`, optional `note`. |
@@ -54,6 +55,15 @@ All built on `send`; failures throw `ApiError` (404 `not in trash` for an unknow
 - `restoreObject(id): Promise<Obj>` — `POST /api/trash/{id}/restore`.
 - `purgeObject(id): Promise<void>` — `DELETE /api/trash/{id}`.
 - `emptyTrash(): Promise<number>` — `DELETE /api/trash`; the purged count.
+
+## `src/lib/attachments.ts`
+All built on `send`; failures throw `ApiError`.
+- `type Attachment` — the server attachment JSON (`id, object_id, name, mime, size, created`).
+- `listAttachments(id): Promise<Attachment[]>` — `GET /api/objects/{id}/attachments`, unwrapped, oldest first.
+- `uploadAttachment(id, file: File): Promise<Attachment>` — `POST /api/objects/{id}/attachments?name=<encodeURIComponent(file.name)>`, the file as the raw body (its type as `Content-Type`); 413 over 25 MiB.
+- `deleteAttachment(aid): Promise<void>` — `DELETE /api/attachments/{aid}`.
+- `downloadUrl(aid, inline = false): string` — `/api/attachments/{aid}`, plus `?inline=1` when `inline`.
+- `humanSize(bytes): string` — `512 B`, `5.0 KiB`, `1.2 MiB`, ... (as the CLI).
 
 ## Hash routes (Shell body)
 - `#/trash` → `Trash`.
