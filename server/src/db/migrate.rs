@@ -13,6 +13,7 @@ pub(super) const MIGRATIONS: &[(u32, &str)] = &[
     (2, include_str!("../../migrations/0002_owner_sessions.sql")),
     (3, include_str!("../../migrations/0003_api_tokens.sql")),
     (4, include_str!("../../migrations/0004_objects.sql")),
+    (5, include_str!("../../migrations/0005_tasks.sql")),
 ];
 
 /// The schema version this binary migrates to.

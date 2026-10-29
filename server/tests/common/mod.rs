@@ -133,3 +133,12 @@ pub async fn create_object(db: &Db, token: &str, kind: &str, title: &str) -> i64
     assert_eq!(res.status, StatusCode::CREATED, "{:?}", res.json());
     res.json()["id"].as_i64().unwrap()
 }
+
+/// Creates a task through `POST /api/tasks` with `task` as its task fields (`json!({})` for
+/// the defaults) and returns its id.
+pub async fn create_task(db: &Db, token: &str, title: &str, task: Value) -> i64 {
+    let body = json!({ "title": title, "task": task });
+    let res = call(db, Method::POST, "/api/tasks", Some(token), Some(body)).await;
+    assert_eq!(res.status, StatusCode::CREATED, "{:?}", res.json());
+    res.json()["id"].as_i64().unwrap()
+}
