@@ -55,7 +55,7 @@ impl Reply {
 }
 
 async fn send(db: &Db, req: Request<Body>) -> Reply {
-    let res = polykov_server::app::router(db.clone())
+    let res = polykov_server::app::router(db.clone(), &std::env::temp_dir().join("polykov-no-web"))
         .oneshot(req)
         .await
         .unwrap();

@@ -24,6 +24,7 @@ rusqlite = { version = "0.41", features = ["bundled"] }
 argon2 = { version = "0.5", features = ["std"] }
 getrandom = "0.3"
 sha2 = "0.10"
+tower-http = { version = "0.7", features = ["fs"] }
 
 [dev-dependencies]
 http-body-util = "0.1"

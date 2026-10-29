@@ -35,7 +35,10 @@ impl Drop for DataDir {
 
 async fn get(db: Db, path: &str) -> (StatusCode, Vec<u8>) {
     let req = Request::get(path).body(Body::empty()).unwrap();
-    let res = polykov_server::app::router(db).oneshot(req).await.unwrap();
+    let res = polykov_server::app::router(db, &std::env::temp_dir().join("polykov-no-web"))
+        .oneshot(req)
+        .await
+        .unwrap();
     let status = res.status();
     let body = res.into_body().collect().await.unwrap().to_bytes().to_vec();
     (status, body)
@@ -70,8 +73,10 @@ async fn health_returns_503_when_db_query_fails() {
 }
 
 #[tokio::test]
-async fn unknown_path_returns_404() {
+async fn unknown_api_path_returns_json_404() {
     let (_dir, db) = DataDir::new("404");
-    let (status, _) = get(db, "/no-such-path").await;
+    let (status, body) = get(db, "/api/no-such-path").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+    let body: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body, json!({ "error": "not found" }));
 }

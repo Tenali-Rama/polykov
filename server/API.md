@@ -22,7 +22,8 @@ Precedence: flag > env var > `<data dir>/config.toml` > default. An empty env va
 Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no gaps) and append it to `MIGRATIONS` in `src/db/migrate.rs`. A test fails if the list and the dir disagree. Never edit a migration that has been merged.
 
 ## Library (`polykov_server`)
-- `app::router(db: db::Db) -> axum::Router`: the full HTTP app over `db`, with no bound port.
+- `app::router(db: db::Db, web_dir: &Path) -> axum::Router`: the full HTTP app over `db`, serving the web UI from `web_dir` (see Web UI), with no bound port.
+- `web::service(web_dir: &Path) -> axum::Router`: the web UI fallback mounted by `app::router`. `web::NOT_BUILT` is the body of its `503`.
 - `db::Db::open(data_dir: &Path) -> Result<Db, db::Error>`: opens `data_dir/polykov.db` (`db::FILE_NAME`), sets the pragmas and migrates. `Db` is a cheap-to-clone handle to one connection behind a mutex.
 - `db::Db::check(&self) -> Result<(), db::Error>`: reads `schema_version`; what `/health` reports as `db`.
 - `db::migrate::{latest() -> u32, current(&Connection) -> rusqlite::Result<u32>, run(&mut Connection) -> Result<(), db::Error>}`: the binary's latest version, a DB's recorded version (0 if never migrated), and apply pending migrations.
@@ -60,4 +61,12 @@ Public. Body `{"password":"..."}`.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 
-Unknown paths return `404` with an empty body.
+Unknown paths under `/api` (including `/api` and `/api/`) and under `/health/` (including `/health/`) return `404 {"error":"not found"}`. Every other path goes to the web UI.
+
+### Web UI (every other path)
+Public. Files are read from `web_dir` at request time (not embedded), so the server builds without a web build and a rebuilt UI is picked up without a restart.
+- `GET`/`HEAD` of a file under `web_dir` returns it with a `Content-Type` guessed from its extension; `/` returns `index.html`.
+- Any other path returns `200` with `index.html` (SPA fallback), including paths that try to leave `web_dir` (`..`, percent-encoded `..`, `/` or `\`): nothing outside `web_dir` is ever read.
+- A directory path without a trailing slash (e.g. `/assets`) returns a bare `307` redirect to the same path with `/` appended.
+- Other methods return `405`.
+- If `web_dir/index.html` does not exist when the router is built, the server still starts, logs one warning, and every web path (any method) returns `503` text/plain `web UI not built: no index.html in web_dir`. Restart after building the UI. `/health` and `/api` are unaffected.
