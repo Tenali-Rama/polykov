@@ -23,6 +23,7 @@ pub fn router(db: Db, web_dir: &Path) -> Router {
         .merge(crate::comments::routes())
         .merge(crate::attachments::routes())
         .merge(crate::tags::routes())
+        .merge(crate::trash::routes())
         .route("/api", any(not_found))
         .route("/api/", any(not_found))
         .route("/api/{*rest}", any(not_found))
