@@ -14,6 +14,7 @@ WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY server/ server/
 COPY cli/ cli/
+COPY parse/ parse/
 RUN cargo build --release --locked -p polykov-server
 
 # --- runtime (no curl: the health check uses bash's /dev/tcp to stay small) ---
