@@ -30,11 +30,23 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `db::Error` displays a one-line message.
 - `auth::routes() -> Router<Db>`: the setup and login routes below, merged by `app::router`.
 - `auth::session::create(&Db) -> Result<String, auth::Error>`: starts a session expiring `session::TTL_SECS` (30 days) from now and returns its token (64 hex chars, 256 random bits). Only `session::hash_token(token)` (hex SHA-256) is stored, in `sessions (token_hash, created_at, expires_at)`, times in Unix seconds.
-- `auth::session::is_valid(&Db, token: &str) -> Result<bool, auth::Error>`: whether `token` is a known, unexpired session. Use this to check bearer tokens and the `auth::COOKIE_NAME` (`polykov_session`) cookie.
+- `auth::session::is_valid(&Db, token: &str) -> Result<bool, auth::Error>`: whether `token` is a known, unexpired session.
+- `auth::session::expires_at(&Db, token: &str) -> Result<Option<String>, auth::Error>`: the unexpired session's expiry as RFC 3339 UTC (`YYYY-MM-DDTHH:MM:SSZ`), `None` if unknown or expired.
+- `auth::session::delete(&Db, token: &str) -> Result<(), auth::Error>`: ends that session; an unknown token is not an error.
+- `auth::Session { token: String, expires_at: String }`: Axum extractor (`FromRequestParts` for any state where `Db: FromRef<S>`) that resolves the caller's session. See Authentication.
 - `auth::owner::{exists, create, password_hash}` and `auth::password::{hash, verify}`: the single `owner` row and argon2id hashing (PHC strings). `auth::Error` displays a one-line message that never contains a password or token.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
+### Authentication
+A request is authenticated by a session token, taken from `Authorization: Bearer <token>` (scheme case-insensitive) if that header is present, otherwise from the `polykov_session` cookie (`auth::COOKIE_NAME`). A present but malformed or invalid bearer header is rejected without looking at the cookie.
+
+A route requires auth by taking `auth::Session` as a handler argument; that is the whole change:
+```rust
+async fn handler(State(db): State<Db>, session: auth::Session) -> Response { ... }
+```
+A missing, unknown or expired session gets `401 {"error":"authentication required"}` and the handler never runs; a store failure gets a bare `500`. Every route except `/health`, `GET`/`POST /api/setup`, `POST /api/login` and the web UI must take it.
+
 ### `GET /health`
 Public. `200` when the database answers:
 ```json
@@ -58,6 +70,12 @@ Public, works once. Body `{"password":"..."}`. Creates the owner with an argon2i
 Public. Body `{"password":"..."}`.
 - `200 {"token":"<64 hex chars>"}` with `Set-Cookie: polykov_session=<token>; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`. The token is sent by the CLI as a bearer token; the web uses the cookie. Each login starts a new 30-day session.
 - `401`, empty body and no cookie: wrong password, or no owner yet.
+
+### `GET /api/me`
+Auth required. `200 {"owner":true,"session_expires":"<RFC 3339 UTC>"}`, e.g. `"2026-11-28T09:15:00Z"`. `401` as in Authentication.
+
+### `POST /api/logout`
+Auth required, no body. Deletes the caller's session (other sessions stay valid) and returns `204`, empty body, with `Set-Cookie: polykov_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`. The token then gets `401` everywhere. `401` as in Authentication, with no cookie change.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 
