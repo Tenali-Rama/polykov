@@ -2,7 +2,7 @@
 id: 028
 title: Add project fields, the project list and project sections API
 milestone: M2
-status: todo
+status: done
 deps: [025]
 touches: [server/src/projects/, server/src/lib.rs+, server/src/app.rs+, server/tests/projects.rs, server/API.md]
 spec: ["Tasks (GTD)", "3. Data Model"]
@@ -30,4 +30,8 @@ Projects have a status, an area and dates, can be listed, and hold ordered secti
 - Goal links (M9). Project timeline layouts (M8).
 
 ## Notes for next
-<!-- builder fills in -->
+- `PATCH /api/projects/{id}` takes a flat body `{status?, area_id?, start?, deadline?}`; object fields (title, tags) stay on `PATCH /api/objects/{id}` (unknown fields are `422`).
+- Task counts include archived tasks but not trashed ones. The list skips archived projects; `GET /api/projects/{id}` still serves them.
+- Section `position` must be ≥ 0; a value past the end clamps to last. Every section write renumbers the project's sections to `0..n` (order by position, then id), so old non-dense data heals.
+- Sections of a trashed project are hidden (`404 section not found`) and come back on restore.
+- `projects::store::is_live` and its own live-area check duplicate `tasks::validate`'s `pub(super)` helpers, since `tasks/` was outside `touches`.
