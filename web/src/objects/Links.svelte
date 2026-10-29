@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { addLink, findByTitle, getLinks, removeLink, type Links, type Summary } from '../lib/links';
   import type { Obj } from '../lib/objects';
   import { objectHref } from './route';
@@ -12,6 +12,7 @@
   let prompting = $state(false);
   let draft = $state('');
   let matches = $state<Obj[] | null>(null);
+  let root: HTMLElement;
 
   onMount(() => act(reload));
 
@@ -40,18 +41,28 @@
     matches = null;
   }
 
+  /** After the DOM updates, focus the `index`-th `[ unlink ]`, else `[ link ]`. */
+  async function refocus(index: number) {
+    await tick();
+    const unlinks = root.querySelectorAll<HTMLButtonElement>('button.unlink');
+    (unlinks[index] ?? root.querySelector<HTMLButtonElement>('button.open'))?.focus();
+  }
+
   function link(to: number) {
     return act(async () => {
       await addLink(id, to);
       close();
       await reload();
+      await refocus(-1);
     });
   }
 
   function unlink(to: number) {
     return act(async () => {
+      const index = links?.links.findIndex((s) => s.id === to) ?? -1;
       await removeLink(id, to);
       await reload();
+      await refocus(index);
     });
   }
 
@@ -77,14 +88,14 @@
   <a href={objectHref(s.id)}>{s.title}</a> <span class="dim">{s.type}</span>
 {/snippet}
 
-<section class="links" aria-label="links">
+<section class="links" aria-label="links" bind:this={root}>
   <p class="label">links</p>
   {#if links}
     <ul>
       {#each links.links as s (s.id)}
         <li>
           {@render entry(s)}
-          <button type="button" aria-label={`unlink ${s.title}`} onclick={() => unlink(s.id)}>[ unlink ]</button>
+          <button type="button" class="unlink" aria-label={`unlink ${s.title}`} onclick={() => unlink(s.id)}>[ unlink ]</button>
         </li>
       {:else}
         <li class="dim">no links</li>
@@ -117,7 +128,7 @@
     {/if}
     <p class="dim">enter searches or links an id, esc cancels</p>
   {:else}
-    <div><button type="button" onclick={open}>[ link ]</button></div>
+    <div><button type="button" class="open" onclick={open}>[ link ]</button></div>
   {/if}
   <p class="label">backlinks</p>
   {#if links}

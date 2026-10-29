@@ -25,12 +25,14 @@
 </script>
 
 <nav class="tags" aria-label="tag folders">
-  <button type="button" class:sel={selected === ''} aria-pressed={selected === ''} onclick={() => onselect('')}>
+  <!-- `data-tag-folder` lets List's j/k/Enter keys through while a folder has focus. -->
+  <button type="button" data-tag-folder class:sel={selected === ''} aria-pressed={selected === ''} onclick={() => onselect('')}>
     all
   </button>
   {#each tags as t (t.tag)}
     <button
       type="button"
+      data-tag-folder
       class:sel={selected === t.tag}
       aria-pressed={selected === t.tag}
       title={t.tag}

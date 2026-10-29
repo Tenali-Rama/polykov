@@ -28,8 +28,16 @@ pub struct Args {
 }
 
 /// GETs the object, merges the changes into its tags and properties, then sends one PATCH
-/// with only the fields that were asked to change.
+/// with only the fields that were asked to change. Without any change flag it exits 2 with a
+/// one-line usage error, before any request.
 pub fn run(ctx: &Ctx, args: Args) -> Result<Output, Error> {
+    if !args.changes_anything() {
+        clap::Error::raw(
+            clap::error::ErrorKind::MissingRequiredArgument,
+            "edit needs at least one of --title, --add-tag, --rm-tag, --prop, --unset\n",
+        )
+        .exit();
+    }
     let client = ctx.client();
     let current = client.get(&path(args.id))?.ok()?;
     let mut changes = Map::new();
@@ -63,6 +71,16 @@ pub fn run(ctx: &Ctx, args: Args) -> Result<Output, Error> {
         .patch(&path(args.id), &Value::Object(changes))?
         .ok()?;
     Ok(output(format!("updated {}", args.id), object))
+}
+
+impl Args {
+    fn changes_anything(&self) -> bool {
+        self.title.is_some()
+            || !self.add_tag.is_empty()
+            || !self.rm_tag.is_empty()
+            || !self.prop.is_empty()
+            || !self.unset.is_empty()
+    }
 }
 
 /// A tag as the server stores it (trimmed, one leading `#` dropped, lowercased), so

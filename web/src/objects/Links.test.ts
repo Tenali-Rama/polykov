@@ -141,6 +141,50 @@ describe('links panel', () => {
     expect(fetch).toHaveBeenCalledWith('/api/objects/7/links/2', expect.objectContaining({ method: 'DELETE' }));
   });
 
+  it('focuses [ link ] after a link', async () => {
+    const state: { links: LinkSet } = { links: empty };
+    api(state, {
+      'PUT /api/objects/7/links/2': () => {
+        state.links = { links: [s(2, 'Write copy')], backlinks: [] };
+        return noContent();
+      },
+    });
+    await fireEvent.click(await open());
+    const input = screen.getByRole('textbox', { name: 'link to id or title' });
+    await fireEvent.input(input, { target: { value: '2' } });
+    await fireEvent.submit(input);
+    await screen.findByRole('link', { name: 'Write copy' });
+    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '[ link ]' })));
+  });
+
+  it("focuses the next row's [ unlink ] after an unlink", async () => {
+    const state: { links: LinkSet } = { links: { links: [s(2, 'A'), s(3, 'B')], backlinks: [] } };
+    api(state, {
+      'DELETE /api/objects/7/links/2': () => {
+        state.links = { links: [s(3, 'B')], backlinks: [] };
+        return noContent();
+      },
+    });
+    await open();
+    await fireEvent.click(screen.getByRole('button', { name: 'unlink A' }));
+    await vi.waitFor(() => expect(screen.queryByRole('link', { name: 'A' })).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'unlink B' })));
+  });
+
+  it('focuses [ link ] after unlinking the last row', async () => {
+    const state: { links: LinkSet } = { links: { links: [s(2, 'A'), s(3, 'B')], backlinks: [] } };
+    api(state, {
+      'DELETE /api/objects/7/links/3': () => {
+        state.links = { links: [s(2, 'A')], backlinks: [] };
+        return noContent();
+      },
+    });
+    await open();
+    await fireEvent.click(screen.getByRole('button', { name: 'unlink B' }));
+    await vi.waitFor(() => expect(screen.queryByRole('link', { name: 'B' })).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '[ link ]' })));
+  });
+
   it('shows a load failure', async () => {
     stubApi({ 'GET /api/objects/7/links': () => new Response('', { status: 500 }) });
     render(Links, { props: { id: 7 } });

@@ -6,7 +6,8 @@
   import Trash from './objects/Trash.svelte';
   import { listHref, parseHash } from './objects/route';
 
-  let { onlogout }: { onlogout: () => void } = $props();
+  // `focusCommand`: focus the command input on mount (after a login).
+  let { onlogout, focusCommand = false }: { onlogout: () => void; focusCommand?: boolean } = $props();
 
   let route = $state(parseHash(location.hash));
   // One-line note above the list (e.g. after a delete); cleared once the route leaves the list.
@@ -69,7 +70,16 @@
   <form class="prompt" onsubmit={(e) => e.preventDefault()}>
     <span class="sigil" aria-hidden="true">&gt;</span>
     <div class="field">
-      <input id="command" bind:value={command} autocomplete="off" spellcheck="false" aria-label="command" />
+      <input
+        id="command"
+        bind:value={command}
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="command"
+        {@attach (node) => {
+          if (focusCommand) node.focus();
+        }}
+      />
       {#if command === ''}
         <span class="placeholder" aria-hidden="true"><span class="cursor"></span>type a command</span>
       {/if}

@@ -7,7 +7,7 @@
   import Links from './Links.svelte';
   import PropsEditor from './PropsEditor.svelte';
   import TagsEditor from './TagsEditor.svelte';
-  import { listHref } from './route';
+  import { listHref, ownsKeys } from './route';
 
   // Shell re-creates this component per id (`{#key}`), so `id` is read once on mount.
   let { id, ondeleted }: { id: number; ondeleted: () => void } = $props();
@@ -81,8 +81,9 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
-    // Editors call `preventDefault` on an Esc they used to cancel.
-    if (e.key === 'Escape' && !e.defaultPrevented) location.hash = listHref;
+    // Editors call `preventDefault` on an Esc they used to cancel; any other control that owns
+    // keys (the Shell command input included) keeps Esc to itself.
+    if (e.key === 'Escape' && !e.defaultPrevented && !ownsKeys(e.target)) location.hash = listHref;
   }
 </script>
 

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import App from './App.svelte';
 
 type Route = (init?: RequestInit) => Response;
@@ -64,6 +65,8 @@ describe('routing', () => {
     render(App);
     expect(await screen.findByRole('button', { name: 'logout' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'command' })).toBeInTheDocument();
+    // Only a fresh login moves focus to the command input.
+    expect(document.activeElement).toBe(document.body);
   });
 
   it('offers a retry when the server cannot be reached', async () => {
@@ -119,6 +122,11 @@ describe('setup', () => {
     await type('confirm', 'correct horse battery');
     await fireEvent.submit(screen.getByRole('button', { name: /create owner/ }));
     expect(await screen.findByText('owner already exists')).toBeInTheDocument();
+    expect(screen.queryByLabelText('password')).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: '[ log in ]' }));
+    expect(await screen.findByText('polykov login')).toBeInTheDocument();
+    expect(screen.getByLabelText('password')).toHaveFocus();
+    expect(screen.queryByText('owner created — log in')).not.toBeInTheDocument();
   });
 
   it('posts the password and moves on to login', async () => {
@@ -155,6 +163,7 @@ describe('login', () => {
     await type('password', 'correct horse battery');
     await fireEvent.submit(screen.getByRole('button', { name: /log in/ }));
     expect(await screen.findByRole('button', { name: 'logout' })).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'command' }));
     expect(localStorage.length).toBe(0);
     expect(sessionStorage.length).toBe(0);
   });
@@ -165,9 +174,9 @@ describe('logout', () => {
     const fetch = server({ ...loggedIn, 'POST /api/logout': () => new Response(null, { status: 204 }) });
     render(App);
     const button = await screen.findByRole('button', { name: 'logout' });
-    button.focus();
+    await userEvent.tab();
     expect(button).toHaveFocus();
-    await fireEvent.click(button);
+    await userEvent.keyboard('{Enter}');
     expect(await screen.findByText('polykov login')).toBeInTheDocument();
     expect(screen.queryByText('owner created — log in')).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/logout', expect.objectContaining({ method: 'POST' }));

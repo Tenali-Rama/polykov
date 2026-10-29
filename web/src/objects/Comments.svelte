@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { addComment, deleteComment, editComment, listComments, type Comment } from '../lib/comments';
 
   // Comment thread of object `id`, oldest first. Ctrl+Enter submits the prompt or an inline edit.
@@ -11,6 +11,7 @@
   let editing = $state<number | null>(null);
   let editDraft = $state('');
   let editError = $state('');
+  let root: HTMLElement;
 
   onMount(() =>
     act(async () => {
@@ -39,10 +40,21 @@
     });
   }
 
+  /** After the DOM updates, focus comment `cid`'s `[ edit ]`, else the `add comment` prompt. */
+  async function refocus(cid: number | undefined) {
+    await tick();
+    const button =
+      cid === undefined ? null : root.querySelector<HTMLButtonElement>(`button[aria-label="edit comment ${cid}"]`);
+    (button ?? root.querySelector<HTMLTextAreaElement>('textarea[aria-label="add comment"]'))?.focus();
+  }
+
   function remove(cid: number) {
     return act(async () => {
       await deleteComment(cid);
-      comments = (comments ?? []).filter((c) => c.id !== cid);
+      const all = comments ?? [];
+      const next = all[all.findIndex((c) => c.id === cid) + 1];
+      comments = all.filter((c) => c.id !== cid);
+      await refocus(next?.id);
     });
   }
 
@@ -63,6 +75,7 @@
       const c = await editComment(cid, editDraft);
       comments = (comments ?? []).map((old) => (old.id === cid ? c : old));
       editing = null;
+      await refocus(cid);
     } catch (e) {
       editError = message(e);
     }
@@ -90,7 +103,7 @@
   }
 </script>
 
-<section class="comments" aria-label="comments">
+<section class="comments" aria-label="comments" bind:this={root}>
   <p class="label">comments</p>
   {#if comments}
     <ul>
@@ -99,8 +112,10 @@
           <p class="meta">
             <span class="dim">{c.created}</span>
             {#if editing !== c.id}
-              <button type="button" aria-label={`edit comment ${c.id}`} onclick={() => edit(c)}>[ edit ]</button>
-              <button type="button" aria-label={`delete comment ${c.id}`} onclick={() => remove(c.id)}>[ delete ]</button>
+              <span class="ops">
+                <button type="button" aria-label={`edit comment ${c.id}`} onclick={() => edit(c)}>[ edit ]</button>
+                <button type="button" aria-label={`delete comment ${c.id}`} onclick={() => remove(c.id)}>[ delete ]</button>
+              </span>
             {/if}
           </p>
           {#if editing === c.id}
@@ -160,6 +175,12 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0 1ch;
+  }
+  /* The timestamp may wrap above the actions; the two buttons stay on one line. */
+  .ops {
+    display: inline-flex;
+    gap: 1ch;
+    white-space: nowrap;
   }
   .body {
     white-space: pre-wrap;

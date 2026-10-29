@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import Shell from './Shell.svelte';
 import { makeObj, stubApi } from './objects/testing';
 
@@ -100,6 +101,19 @@ describe('hash routes', () => {
     location.hash = '#/o/4';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     expect(await screen.findByRole('heading', { name: 'Opened' })).toBeInTheDocument();
+  });
+
+  it('Esc in the command input keeps the detail; Esc on the page goes back', async () => {
+    stubApi(routes);
+    location.hash = '#/o/4';
+    render(Shell, { props });
+    await screen.findByRole('heading', { name: 'Opened' });
+    await userEvent.type(screen.getByRole('textbox', { name: 'command' }), 'today{Escape}');
+    expect(location.hash).toBe('#/o/4');
+    await fireEvent.keyDown(screen.getByRole('button', { name: '[ pin ]' }), { key: 'Escape' });
+    expect(location.hash).toBe('#/o/4');
+    await fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(location.hash).toBe('#/');
   });
 
   it('the list links to #/trash, which shows the trash view', async () => {
