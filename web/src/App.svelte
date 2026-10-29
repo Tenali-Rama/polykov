@@ -25,20 +25,28 @@
     view = 'login';
   }
 
-  function loggedOut() {
+  function showLogin() {
     loginNote = '';
     view = 'login';
+  }
+
+  // A fresh login hands focus to the command input; a reload with a session keeps the default.
+  let loggedIn = $state(false);
+
+  function loginDone() {
+    loggedIn = true;
+    view = 'shell';
   }
 
   onMount(route);
 </script>
 
 {#if view === 'setup'}
-  <Setup ondone={setupDone} />
+  <Setup ondone={setupDone} onlogin={showLogin} />
 {:else if view === 'login'}
-  <Login note={loginNote} ondone={() => (view = 'shell')} />
+  <Login note={loginNote} ondone={loginDone} />
 {:else if view === 'shell'}
-  <Shell onlogout={loggedOut} />
+  <Shell onlogout={showLogin} focusCommand={loggedIn} />
 {:else}
   <main class="screen" aria-busy={view === 'loading'}>
     {#if view === 'loading'}

@@ -150,6 +150,43 @@ describe('comments panel', () => {
     expect(fetch).toHaveBeenCalledWith('/api/comments/1', expect.objectContaining({ method: 'DELETE' }));
   });
 
+  it('[ edit ] and [ delete ] share one group in the header row', async () => {
+    api([comment(1, 'first')]);
+    await open();
+    const edit = await screen.findByRole('button', { name: 'edit comment 1' });
+    const remove = screen.getByRole('button', { name: 'delete comment 1' });
+    expect(edit.parentElement).toBe(remove.parentElement);
+    expect(edit.parentElement).not.toBe(screen.getByText('2026-10-29T09:15:00Z').parentElement);
+    expect(edit.parentElement?.parentElement).toBe(screen.getByText('2026-10-29T09:15:00Z').parentElement);
+  });
+
+  it('focuses the comment’s [ edit ] after saving an edit', async () => {
+    api([comment(1, 'frist')]);
+    await open();
+    await fireEvent.click(await screen.findByRole('button', { name: 'edit comment 1' }));
+    const area = screen.getByRole('textbox', { name: 'edit comment 1' });
+    await fireEvent.input(area, { target: { value: 'first' } });
+    await fireEvent.keyDown(area, { key: 'Enter', ctrlKey: true });
+    await screen.findByText('first');
+    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'edit comment 1' })));
+  });
+
+  it('focuses the next comment’s [ edit ] after a delete', async () => {
+    api([comment(1, 'gone'), comment(2, 'stays')]);
+    await open();
+    await fireEvent.click(await screen.findByRole('button', { name: 'delete comment 1' }));
+    await vi.waitFor(() => expect(screen.queryByText('gone')).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'edit comment 2' })));
+  });
+
+  it('focuses the add comment prompt after deleting the last comment', async () => {
+    api([comment(2, 'stays'), comment(1, 'gone')]);
+    await open();
+    await fireEvent.click(await screen.findByRole('button', { name: 'delete comment 1' }));
+    await vi.waitFor(() => expect(screen.queryByText('gone')).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'add comment' })));
+  });
+
   it('a failed delete shows the cause and keeps the comment', async () => {
     api([comment(1, 'stays')], { 'DELETE /api/comments/1': () => Response.json({ error: 'comment not found' }, { status: 404 }) });
     await open();

@@ -60,8 +60,13 @@
     rowsEl.querySelectorAll('a')[sel]?.focus();
   }
 
+  /** Tag-folder buttons pass list keys through; other controls keep them. */
+  function keepsKeys(target: EventTarget | null): boolean {
+    return ownsKeys(target) && !(target instanceof HTMLElement && target.matches('[data-tag-folder]'));
+  }
+
   function onkeydown(e: KeyboardEvent) {
-    if (e.ctrlKey || e.metaKey || e.altKey || ownsKeys(e.target) || objects.length === 0) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || keepsKeys(e.target) || objects.length === 0) return;
     if (e.key === 'j') move(1);
     else if (e.key === 'k') move(-1);
     else if (e.key === 'Enter') location.hash = objectHref(objects[sel].id);

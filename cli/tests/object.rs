@@ -224,6 +224,23 @@ fn edit_merges_into_one_patch() {
 }
 
 #[test]
+fn edit_without_change_flags_is_a_usage_error_and_sends_nothing() {
+    let (server, home) = setup("obj-edit-none");
+    let id = create(&server, &home, &["note", "Same"]);
+    let before = show_json(&server, &home, id)["updated"].clone();
+    let out = run(home
+        .polykov()
+        .args(["edit", &id.to_string(), "--server", &server.url]));
+    assert_eq!(out.code, 2);
+    assert_eq!(out.stderr.lines().count(), 1, "{}", out.stderr);
+    for flag in ["--title", "--add-tag", "--rm-tag", "--prop", "--unset"] {
+        assert!(out.stderr.contains(flag), "{flag}: {}", out.stderr);
+    }
+    assert!(out.stdout.is_empty());
+    assert_eq!(show_json(&server, &home, id)["updated"], before);
+}
+
+#[test]
 fn pin_unpin_archive_unarchive() {
     let (server, home) = setup("obj-flags");
     let id = create(&server, &home, &["note", "Flags"]);

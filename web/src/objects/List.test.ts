@@ -154,6 +154,29 @@ describe('keyboard', () => {
     expect(location.hash).toBe('#/o/2');
   });
 
+  it('j/k/Enter work from a focused tag folder; other buttons keep the keys', async () => {
+    api([makeObj(3), makeObj(2), makeObj(1)]);
+    render(List);
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    const folder = screen.getByRole('button', { name: 'all' });
+    folder.focus();
+    await fireEvent.keyDown(folder, { key: 'j' });
+    expect(rows()[1]).toHaveAttribute('aria-current', 'true');
+    expect(rows()[1]).toHaveFocus();
+
+    folder.focus();
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    folder.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(true);
+    expect(location.hash).toBe('#/o/2');
+
+    location.hash = '';
+    await fireEvent.keyDown(screen.getByRole('button', { name: '[ add ]' }), { key: 'j' });
+    await fireEvent.keyDown(screen.getByRole('button', { name: '[ add ]' }), { key: 'Enter' });
+    expect(rows()[1]).toHaveAttribute('aria-current', 'true');
+    expect(location.hash).toBe('');
+  });
+
   it('ignores j while typing a title', async () => {
     api([makeObj(2), makeObj(1)]);
     render(List);

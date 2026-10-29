@@ -2,7 +2,7 @@
 id: 037
 title: Fix M0/M1 review nits in web focus, keys, setup and CLI edit
 milestone: M2
-status: todo
+status: done
 deps: []
 touches: [web/src/App.svelte, web/src/App.test.ts, web/src/Shell.svelte, web/src/Shell.test.ts, web/src/auth/Setup.svelte, web/src/objects/route.ts, web/src/objects/Detail.svelte, web/src/objects/Detail.test.ts, web/src/objects/List.svelte, web/src/objects/List.test.ts, web/src/objects/TagTree.svelte, web/src/objects/Links.svelte, web/src/objects/Links.test.ts, web/src/objects/Comments.svelte, web/src/objects/Comments.test.ts, web/API.md, cli/src/cmd/object/edit.rs, cli/src/client.rs, cli/tests/object.rs, cli/API.md]
 spec: ["7. Clients & UI", "8. Customization & Accessibility"]
@@ -33,4 +33,8 @@ Owner request: fix the review nits left open from M0/M1, adding no features. Eac
 - Any new feature or layout change beyond items 1–9. The other M1 phone-check failures found by 033 are separate follow-ups.
 
 ## Notes for next
-<!-- builder fills in -->
+- Added dev dep `@testing-library/user-event` (web/package.json + lock, outside `touches`) for criterion 3's `userEvent.tab()`.
+- Shell takes `focusCommand`; App sets it only after a fresh login, so a reload with a session keeps focus on body (j/k on the list still work).
+- After a setup 409 the same AuthPanel turns into `[ log in ]` with the fields hidden (no AuthPanel change needed).
+- Detail's Esc now ignores any `ownsKeys` target, buttons included; List lets `[data-tag-folder]` buttons through.
+- Follow-up (e2e, not touched to stay parallel with 033): at 360 px, check `[ edit ]`/`[ delete ]` share the same `top` in Comments.
