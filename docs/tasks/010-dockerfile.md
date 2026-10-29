@@ -2,7 +2,7 @@
 id: 010
 title: Add Dockerfile and docker-compose for one-command start
 milestone: M0
-status: todo
+status: done
 deps: [003, 006, 007]
 touches: [Dockerfile, .dockerignore, docker-compose.yml, docs/install.md]
 spec: ["9. Security & Self-Hosting", "2. Architecture & Stack", "10. Non-Functional"]
@@ -24,4 +24,8 @@ spec: ["9. Security & Self-Hosting", "2. Architecture & Stack", "10. Non-Functio
 - CI image build (011), systemd unit and one-command install script (M17), built-in TLS.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- The Dockerfile works with the legacy builder (no BuildKit `--mount`), so plain `docker build` works anywhere; Rust builds are not cached between builds.
+- Runtime is `debian:trixie-slim` (glibc matches `rust:1-slim-trixie`) with no curl: `HEALTHCHECK` speaks HTTP/1.0 over bash `/dev/tcp`. Image is about 126 MB; adding curl took it to 145 MB, too close to the 150 MB limit.
+- Runs as `polykov` (uid 10001); `/data` is created and owned by it, so a fresh named volume inherits that ownership.
+- Compose pins the volume name to `polykov-data` (not `<project>_polykov-data`) so it matches docs/install.md and the plain `docker run -v polykov-data:/data` example.
+- For 011: `docker build -t polykov .` takes several minutes cold on 2 vCPU, so cache layers in CI.
