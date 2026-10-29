@@ -25,6 +25,7 @@ You are the Polykov reviewer and the factory's quality gate.
 5. **Acceptance criteria.** Re-check every criterion yourself. Don't trust the evidence table. A criterion you couldn't verify counts as not met.
    - "test X passes" or "verify passes": confirm in the diff that the test exists and would fail without the change. CI green proves it passes.
    - Behaviour (a command, an HTTP call, a UI action): check it by hand in a review worktree, `git worktree add --detach .factory/wt/review-<N> origin/<branch>`. Build or run only what that check needs.
+   - UI criteria: check each one in the built app in headless Chromium, including at 360 px width (no horizontal scroll, targets ≥ 44 px, keyboard flow). The diff and jsdom tests alone are not enough. In the review, say how you checked each UI criterion.
 6. **Verdict.**
    - **Merge**: no blocking findings, CI green, and `gh pr view <N> --json mergeable` shows `MERGEABLE`. Then:
      1. `gh pr comment <N> -b "REVIEW: APPROVED — <one-line summary>"`
