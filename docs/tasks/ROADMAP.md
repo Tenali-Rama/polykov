@@ -17,7 +17,7 @@ One line per milestone: `M<n> — <goal> — spec: <sections>`. Each milestone e
 - M12 — Analytics and forecasts: decision-driving analytics per area, calibrated forecast ranges with backtests, forecast feedback loop, model accuracy page, query-filterable charts, journal analytics, review auto-summaries — spec: Analytics & Forecasts, Journaling, Reviews
 - M13 — Linux desktop app: Tauri 2 wrapper, system-wide capture hotkey, tray icon, always-on-top floating timer, native notifications, release job — spec: 7. Clients & UI, Capture, Time & Focus
 - M14 — Android app: Tauri 2 phone/tablet, touch layout with swipe actions and split pane, Kotlin widgets (Today, quick add, habit, timer), quick-settings tile, share target, notification timer — spec: 7. Clients & UI, Capture
-- M15 — TUI and CLI completion: `polykov tui` main views, CLI parity for views/journal/timer/habits — spec: 7. Clients & UI
+- M15 — TUI and CLI completion: `polykov tui` main views, CLI parity for task fields/checklists/sections and views/journal/timer/habits — spec: 7. Clients & UI
 - M16 — Customization and accessibility: themes, custom colors/icons/CSS, background image, rebindable shortcuts, vim mode, toggleable modules, sidebar ordering, WCAG AA, reduced motion — spec: 8. Customization & Accessibility
 - M17 — Data ownership and self-hosting: import (CSV, Markdown) with field mapping, full export (MD + CSV + JSON), daily backups with rotation + restore, TOTP 2FA, optional built-in TLS, systemd unit, one-command install, docs — spec: Capture, 9. Security & Self-Hosting, 1. Principles
 - M18 — Gamification: karma, levels, pixel-art badges, daily/weekly karma goals, all toggleable — spec: Gamification (toggleable)
