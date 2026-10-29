@@ -4,13 +4,13 @@ Builders meet this before opening a PR. Reviewers check every point. A PR merges
 
 ## Definition of done
 1. **Acceptance criteria**: every criterion is met. The reviewer re-checks each one and does not trust the PR's evidence table.
-2. **Verify**: `scripts/factory/clean-verify.sh` passes on the pushed branch, and CI is green.
+2. **Verify**: `scripts/verify.sh` passes in the builder's worktree, and PR CI is green. CI runs the same script in a fresh checkout, so it is the gate. Nobody re-runs `clean-verify.sh` on a PR.
 3. **Tests**:
    - New behaviour is covered, including at least one edge or failure path.
    - Tests would fail without the change.
    - No tests that only assert mocks.
 4. **Spec**: matches the referenced spec sections. Nothing is invented beyond them.
-5. **Scope**: changes stay within the task's `touches`, or the PR says why not. No drive-by refactors.
+5. **Scope**: changes stay within the task's `touches`, or the PR says why not. No drive-by refactors. An append-only entry (trailing `+`) only adds lines to that file and changes none, because another task may be adding lines in parallel.
 6. **Code**:
    - Reads like the surrounding code.
    - Files ≤ 400 lines.

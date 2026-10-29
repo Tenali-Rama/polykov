@@ -18,10 +18,12 @@ Your team:
 How code flows:
 
 ```
-builder  → task branch → clean-verify → PR → CI green
-reviewer → clean-verify + criteria + diff review + CI green → squash-merge
+builder  → task branch → verify.sh (once) → PR → CI green
+reviewer → CI green (the verify gate) + criteria + diff review → squash-merge
 main is protected: only PRs with green CI (verify, policy) can land
 ```
+
+Verify runs once locally and once in CI per round, never more (ADR 0004). `clean-verify.sh` is only for reproducing a red main.
 
 ## Your context discipline
 - You read only:
@@ -52,12 +54,13 @@ When the owner says "start building", "resume", or starts a new session with you
    - No `docs/tasks/ROADMAP.md`, or the next milestone has no task files → spawn `planner` in the background. Its PR goes through review like any other.
    - All milestones done → report to the owner and stop.
 2. **Dispatch.**
-   - Pick up to **3** ready tasks, lowest id first. Their `touches` must not overlap each other or anything already in flight.
+   - Pick up to **3** ready tasks, lowest id first. Their `touches` must not overlap each other or anything already in flight. `scripts/factory/board.sh --overlap <candidate ids> <in-flight ids>` must print `no overlap`. Otherwise, drop the highest-id candidate named in its output and re-run.
+   - Overlap means the same file, or a dir that contains the other entry. Shared files never count: `Cargo.lock`, any `API.md`, and `docs/decisions/`. Neither do two append-only entries (trailing `+`, e.g. `server/src/lib.rs+`) on the same file. Builders resolve their conflicts mechanically at rebase ("Rebase" in LESSONS.md).
    - Spawn one `builder` per task with `isolation: "worktree"`, in the background, with the prompt: `Task: docs/tasks/<file>. Build it per your instructions.`
 3. **Review.** When a builder returns PR #N, spawn a `reviewer` in the background with: `Review PR #N for task docs/tasks/<file>.`
 4. **Fix loop.** When the reviewer returns:
    - `MERGED` → record it and go back to step 0. A merge can unblock more tasks.
-   - `CHANGES` → spawn a fresh `builder` (worktree) with: `Task: docs/tasks/<file>. PR #N needs fixes: address every point in the latest REVIEW comment.` Then round += 1.
+   - `CHANGES` → spawn a fresh `builder` (worktree) with: `Task: docs/tasks/<file>. PR #N needs fixes: address every point in the latest REVIEW comment.` Then round += 1. A rebase-only round (the only slug is `rebase`) doesn't count toward the round limit.
    - Still not merged after round 3 → close the PR and have the planner split the task. Escalate to the owner only if that also fails.
 5. **Blocked.** When a builder returns `BLOCKED: <question>`:
    - If spec.md or `docs/decisions/` answers it → spawn a fresh builder whose prompt adds `Answer: <answer>`.

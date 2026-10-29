@@ -3,17 +3,44 @@
 #   board.sh          all tasks
 #   board.sh --ready  todo tasks whose deps are all done
 #   board.sh --check  validate frontmatter (used by verify.sh)
+#   board.sh --overlap <id>...  print task pairs whose touches overlap; exit 1 if any (COO dispatch)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 mode=${1:-all}
 
 field() { sed -n '/^---$/,/^---$/p' "$2" | sed -n "s/^$1:[[:space:]]*//p" | head -1; }
 list() { tr -d '[]"' <<<"$1" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | sed '/^$/d'; }
+# Shared files never block parallel work: their rebase conflicts are mechanical (LESSONS.md, Rebase).
+shared() { [[ $1 == Cargo.lock || $1 == API.md || $1 == */API.md || $1 == docs/decisions/* ]]; }
+# Two touches overlap if equal, or if one is a dir (trailing /) that contains the other.
+overlaps() { [[ $1 == "$2" || ($1 == */ && $2 == "$1"*) || ($2 == */ && $1 == "$2"*) ]]; }
 
 shopt -s nullglob
 files=(docs/tasks/[0-9]*.md)
-declare -A status
-for f in "${files[@]}"; do status[$(field id "$f")]=$(field status "$f"); done
+declare -A status touch
+for f in "${files[@]}"; do
+  id=$(field id "$f"); status[$id]=$(field status "$f"); touch[$id]=$(field touches "$f")
+done
+
+if [ "$mode" = --overlap ]; then
+  shift; ids=("$@"); hit=0
+  for id in "${ids[@]}"; do [ -n "${touch[$id]+x}" ] || { echo "unknown task '$id'"; exit 2; }; done
+  for ((i = 0; i < ${#ids[@]}; i++)); do
+    for ((j = i + 1; j < ${#ids[@]}; j++)); do
+      for p in $(list "${touch[${ids[i]}]}"); do
+        for q in $(list "${touch[${ids[j]}]}"); do
+          # A trailing + marks an append-only edit (one registration line); two of those never clash.
+          [[ $p == *+ && $q == *+ ]] && continue
+          if ! shared "${p%+}" && ! shared "${q%+}" && overlaps "${p%+}" "${q%+}"; then
+            echo "${ids[i]} ${ids[j]}: $p ~ $q"; hit=1
+          fi
+        done
+      done
+    done
+  done
+  [ $hit = 0 ] && echo "no overlap"
+  exit $hit
+fi
 
 errors=0
 for f in "${files[@]}"; do
