@@ -28,17 +28,30 @@ export async function serverVersion(): Promise<string | null> {
   }
 }
 
-/** `POST` `body` as JSON (or no body); throws `ApiError` with the server's `error` text on non-2xx. */
-export async function post(path: string, body?: unknown): Promise<Response> {
+export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+/**
+ * Same-origin request. A `Blob`/`File` body is sent raw with its own type, any other body as JSON
+ * (no body when `undefined`). Throws `ApiError` with the server's `error` text on non-2xx.
+ */
+export async function send(method: Method, path: string, body?: unknown): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  const init: RequestInit = { method: 'POST', headers };
-  if (body !== undefined) {
+  const init: RequestInit = { method, headers };
+  if (body instanceof Blob) {
+    if (body.type !== '') headers['Content-Type'] = body.type;
+    init.body = body;
+  } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     init.body = JSON.stringify(body);
   }
   const res = await fetch(path, init);
   if (!res.ok) throw new ApiError(res.status, await errorText(res, path));
   return res;
+}
+
+/** `send('POST', ...)`. */
+export function post(path: string, body?: unknown): Promise<Response> {
+  return send('POST', path, body);
 }
 
 async function errorText(res: Response, path: string): Promise<string> {

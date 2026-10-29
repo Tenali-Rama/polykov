@@ -1,7 +1,57 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, getJson, serverVersion } from './api';
+import { ApiError, getJson, send, serverVersion } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
+
+function stubFetch(res: () => Response) {
+  const fn = vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(async () => res());
+  vi.stubGlobal('fetch', fn);
+  return fn;
+}
+
+describe('send', () => {
+  it('sends a plain body as JSON with the given method', async () => {
+    const fetch = stubFetch(() => Response.json({}));
+    await send('PATCH', '/api/objects/1', { title: 'x' });
+    const [path, init] = fetch.mock.calls[0];
+    expect(path).toBe('/api/objects/1');
+    expect(init?.method).toBe('PATCH');
+    expect((init?.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+    expect(init?.body).toBe('{"title":"x"}');
+  });
+
+  it('sends a Blob raw with its own type', async () => {
+    const fetch = stubFetch(() => Response.json({}));
+    const file = new File(['hi'], 'a.txt', { type: 'text/plain' });
+    await send('POST', '/api/objects/1/attachments?name=a.txt', file);
+    const init = fetch.mock.calls[0][1];
+    expect(init?.body).toBe(file);
+    expect((init?.headers as Record<string, string>)['Content-Type']).toBe('text/plain');
+  });
+
+  it('sends no body and no content type when body is undefined', async () => {
+    const fetch = stubFetch(() => new Response(null, { status: 204 }));
+    await send('DELETE', '/api/objects/1');
+    const init = fetch.mock.calls[0][1];
+    expect(init?.method).toBe('DELETE');
+    expect(init?.body).toBeUndefined();
+    expect(init?.headers).not.toHaveProperty('Content-Type');
+  });
+
+  it('throws ApiError with the server error text', async () => {
+    stubFetch(() => Response.json({ error: 'object not found' }, { status: 404 }));
+    const err = await send('GET', '/api/objects/9').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(404);
+    expect((err as ApiError).message).toBe('object not found');
+  });
+
+  it('falls back to path and status when the error body is not JSON', async () => {
+    stubFetch(() => new Response('boom', { status: 500 }));
+    const err = await send('PUT', '/api/x').catch((e: unknown) => e);
+    expect((err as ApiError).message).toBe('/api/x: HTTP 500');
+  });
+});
 
 describe('getJson', () => {
   it('throws ApiError carrying the status on non-2xx', async () => {
