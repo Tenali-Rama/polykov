@@ -1,0 +1,44 @@
+:root {
+  --bg: #f6f5f1;
+  --fg: #1d1f21;
+  --dim: #6b6f73;
+  --line: #a7aaad;
+  --accent: #2f6f9f;
+  --ok: #2e7d32;
+  --err: #b3261e;
+  font-family: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', 'DejaVu Sans Mono', Menlo, Consolas, monospace;
+  font-size: 15px;
+  line-height: 1.4;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141517;
+    --fg: #d6d6d0;
+    --dim: #8a8d90;
+    --line: #44474a;
+    --accent: #7fb3d5;
+    --ok: #8fbf7f;
+    --err: #e28a80;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  overflow-x: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
