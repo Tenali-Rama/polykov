@@ -1,4 +1,0 @@
-# Local builds share one build dir across all worktrees (ADR 0004), so dependencies compile once.
-# Final binaries still land in each checkout's own target/. CI overrides this in its workflows.
-[build]
-build-dir = "{cargo-cache-home}/polykov-build"

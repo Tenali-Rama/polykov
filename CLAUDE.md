@@ -20,7 +20,6 @@ Self-hosted, single-user productivity app. `spec.md` defines *what* to build. Th
 - `scripts/factory/board.sh [--ready|--check]`: task status table.
 - `scripts/factory/spec.sh "<heading>"`: print a single spec section.
 - `scripts/factory/board.sh --overlap <ids>`: can these tasks run in parallel?
-- Cargo build cache: `.cargo/config.toml` makes every local checkout share one build dir, `~/.cargo/polykov-build`, while binaries stay in `./target/`. CI keeps `target/` (ADR 0004).
 
 ## Context rules (everyone)
 - Load only what the task needs, in this order:

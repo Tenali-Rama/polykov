@@ -12,10 +12,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Keep CI's build dir at target/ (cached by rust-cache); .cargo/config.toml shares it only locally.
-  CARGO_BUILD_BUILD_DIR: ${{ github.workspace }}/target
-
 jobs:
   verify:
     runs-on: ubuntu-latest

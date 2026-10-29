@@ -9,10 +9,6 @@ permissions:
   contents: write
   packages: write
 
-env:
-  # Keep the build dir at target/ (cached by rust-cache); .cargo/config.toml shares it only locally.
-  CARGO_BUILD_BUILD_DIR: ${{ github.workspace }}/target
-
 jobs:
   server-and-cli:
     runs-on: ubuntu-latest
