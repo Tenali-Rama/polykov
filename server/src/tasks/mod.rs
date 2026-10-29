@@ -1,15 +1,17 @@
 //! Tasks (spec §3 "Task", "Tasks (GTD)"): `POST /api/tasks`, `GET`/`PATCH
 //! /api/tasks/{id}` and `POST /api/tasks/{id}/complete|reopen`. Every route requires auth.
 
+pub mod recurrence;
 pub mod store;
 pub mod validate;
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::{get, post},
 };
+use chrono::NaiveDate;
 use serde::{Deserialize, Deserializer};
 use serde_json::{Value, json};
 
@@ -125,15 +127,29 @@ async fn update(
         .ok_or_else(not_found)
 }
 
+/// Query of `POST /api/tasks/{id}/complete`.
+#[derive(Deserialize)]
+struct CompleteQuery {
+    today: Option<String>,
+}
+
 async fn complete(
     State(db): State<Db>,
     _: Session,
     Path(id): Path<i64>,
+    Query(query): Query<CompleteQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let task = blocking(move || store::complete(&db, id))
+    let today = match query.today {
+        Some(day) => NaiveDate::parse_from_str(&day, "%Y-%m-%d")
+            .ok()
+            .filter(|_| day.len() == 10)
+            .ok_or_else(|| ApiError::bad_request("today must be a date YYYY-MM-DD"))?,
+        None => validate::today(),
+    };
+    let (task, next) = blocking(move || recurrence::complete(&db, id, today))
         .await?
         .ok_or_else(not_found)?;
-    Ok(Json(json!({ "task": task, "next": null })))
+    Ok(Json(json!({ "task": task, "next": next })))
 }
 
 async fn reopen(

@@ -1,0 +1,6 @@
+# 0013 — Recurring tasks
+
+- **Status**: accepted
+- **Context**: Spec §3 asks for recurring tasks, counted from a fixed date or "after completion" (task 027). We need a storable rule format and a way to produce occurrences.
+- **Decision**: A task's `recurrence` is JSON `{"rule": <RRULE subset>, "from": "scheduled"|"completion"}` in `tasks.recurrence`. The rule is `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY[;INTERVAL=1..365][;BYDAY=..][;BYMONTHDAY=1..31]`, stored in canonical form, parsed and stepped by the pure `server/src/recur/` module (no DB, no HTTP). Occurrences are spawned on complete: completing a recurring task creates the next one as a new task (same fields, checklist unchecked, `scheduled` = `next(anchor)`, deadline shifted by the same days) and sets the done task's `recurrence` to `null`, so the series lives only on its latest open task. A month day past the month's end clamps to the last day.
+- **Consequences**: There is one open task per series and no stored occurrence list, so views need no expansion. History is the chain of done tasks, not linked to each other. A rule without `BYMONTHDAY` keeps the anchor's day, so a series started on the 31st drifts to the 28th after February; set `BYMONTHDAY` to avoid it. Don't add RRULE parts outside `recur/` or store non-canonical rules. Reopening a done occurrence doesn't restore its rule (owner may change).
