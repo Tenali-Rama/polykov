@@ -15,9 +15,7 @@ const TOKEN_BYTES: usize = 32;
 /// Starts a session expiring [`TTL_SECS`] from now and returns its token (64 hex chars).
 /// Only the token's hash is stored, so it cannot be recovered later.
 pub fn create(db: &Db) -> Result<String, Error> {
-    let mut bytes = [0u8; TOKEN_BYTES];
-    getrandom::fill(&mut bytes).map_err(Error::Random)?;
-    let token = hex(&bytes);
+    let token = new_token()?;
     let conn = db.conn()?;
     conn.execute(
         "INSERT INTO sessions (token_hash, expires_at) VALUES (?1, unixepoch() + ?2)",
@@ -57,7 +55,15 @@ pub fn delete(db: &Db, token: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// The value stored in `sessions.token_hash` for `token`: lowercase hex SHA-256.
+/// A fresh random token: [`TOKEN_BYTES`] from the OS, hex-encoded (64 chars).
+pub(super) fn new_token() -> Result<String, Error> {
+    let mut bytes = [0u8; TOKEN_BYTES];
+    getrandom::fill(&mut bytes).map_err(Error::Random)?;
+    Ok(hex(&bytes))
+}
+
+/// The value stored in `sessions.token_hash` (and `api_tokens.token_hash`) for `token`:
+/// lowercase hex SHA-256.
 pub fn hash_token(token: &str) -> String {
     hex(&Sha256::digest(token.as_bytes()))
 }

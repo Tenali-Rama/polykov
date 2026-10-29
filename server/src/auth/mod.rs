@@ -1,12 +1,14 @@
 //! Owner setup, password login and session issuing (spec §9).
 //!
 //! Routes: `GET`/`POST /api/setup` and `POST /api/login` (public), `GET /api/me` and
-//! `POST /api/logout` (auth required). Routes require auth by taking a [`Session`] argument.
+//! `POST /api/logout` (auth required), plus the API token routes in [`tokens`]. Routes
+//! require auth by taking a [`Session`] argument.
 
 mod extract;
 pub mod owner;
 pub mod password;
 pub mod session;
+pub mod tokens;
 
 use std::fmt;
 
@@ -37,6 +39,7 @@ pub fn routes() -> Router<Db> {
         .route("/api/login", post(login))
         .route("/api/me", get(me))
         .route("/api/logout", post(logout))
+        .merge(tokens::routes())
 }
 
 /// Request body of setup and login. No `Debug`, so the password cannot end up in a log line.

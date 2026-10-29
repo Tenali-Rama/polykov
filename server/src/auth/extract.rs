@@ -8,18 +8,18 @@ use axum::{
 };
 use serde_json::json;
 
-use super::{COOKIE_NAME, blocking, session};
+use super::{COOKIE_NAME, blocking, session, tokens};
 use crate::db::Db;
 
-/// A valid, unexpired session, taken from `Authorization: Bearer <token>` or else from the
-/// `polykov_session` cookie. Adding it as a handler argument makes the route require auth:
-/// a missing, unknown or expired session is rejected with
+/// A valid, unexpired session or API token, taken from `Authorization: Bearer <token>` or
+/// else from the `polykov_session` cookie. Adding it as a handler argument makes the route
+/// require auth: a missing, unknown or expired token is rejected with
 /// `401 {"error":"authentication required"}` before the handler runs.
 pub struct Session {
     /// The raw token the client sent.
     pub token: String,
-    /// When the session expires, RFC 3339 UTC.
-    pub expires_at: String,
+    /// When the session expires, RFC 3339 UTC; `None` for an API token, which never expires.
+    pub expires_at: Option<String>,
 }
 
 impl<S> FromRequestParts<S> for Session
@@ -35,7 +35,11 @@ where
         };
         let db = Db::from_ref(state);
         let lookup = token.clone();
-        match blocking(move || session::expires_at(&db, &lookup)).await {
+        let found = blocking(move || match session::expires_at(&db, &lookup)? {
+            Some(expires_at) => Ok(Some(Some(expires_at))),
+            None => Ok(tokens::authenticate(&db, &lookup)?.then_some(None)),
+        });
+        match found.await {
             Ok(Some(expires_at)) => Ok(Session { token, expires_at }),
             Ok(None) => Err(unauthorized()),
             Err(code) => Err(code.into_response()),
