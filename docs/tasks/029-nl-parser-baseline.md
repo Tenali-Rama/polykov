@@ -28,7 +28,7 @@ A new workspace crate parses a smart-add line into a title plus typed tokens, be
   - deadlines `due <date>` / `by <date>`
   - recurrence `every day|weekday|week|month|year`, `daily`/`weekly`/`monthly`/`yearly`, `every <weekday>[, and <weekday>]`, `every N days|weeks|months|years`, `every 15th`. A `every!` prefix means from completion. A recurrence with no date also sets `scheduled` to its first occurrence on or after today.
   - `"quoted text"` is never parsed, and the quotes are dropped from the title.
-- [ ] The title is the input minus tokens, with whitespace collapsed. The spec example `call mom tmrw 5pm 30m p2 #family every sunday` gives title `call mom`, all eight fields, and tokens in input order.
+- [ ] The title is the input minus tokens, with whitespace collapsed. The spec example `call mom tmrw 5pm 30m p2 #family every sunday` with `today` = 2026-10-30 (a Friday) gives title `call mom`, scheduled `2026-10-31T17:00` (an explicit date wins over the rule's first occurrence), estimate 30, priority 2, tags `["family"]`, recurrence `{rule: "FREQ=WEEKLY;BYDAY=SU", from: scheduled}`, and deadline/project/area all `None`. Its tokens come out in input order: `tmrw` Date, `5pm` Time, `30m` Duration, `p2` Priority, `#family` Tag, `every sunday` Recurrence.
 - [ ] Plain titles stay plain: `read 1984`, `buy 2 apples`, `email may`, `watch sunday times` (only `sunday` → date is acceptable) each have a test documenting their result.
 - [ ] `cargo test -p polykov-parse` passes. The crate has no I/O and no network.
 - [ ] A new ADR, with the next free number, `docs/decisions/NNNN-parse-crate.md`, records the crate, the trait and the syntax. Date math uses `chrono`, or another crate named in the ADR.

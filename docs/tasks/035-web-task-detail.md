@@ -3,7 +3,7 @@ id: 035
 title: Add the web task panel with fields, recurrence, checklist and sub-tasks
 milestone: M2
 status: todo
-deps: [034]
+deps: [034, 037]
 touches: [web/src/tasks/TaskFields.svelte, web/src/tasks/TaskFields.test.ts, web/src/tasks/Recurrence.svelte, web/src/tasks/Checklist.svelte, web/src/tasks/Checklist.test.ts, web/src/tasks/Subtasks.svelte, web/src/tasks/Subtasks.test.ts, web/src/lib/tasks.ts, web/src/lib/tasks.test.ts, web/src/objects/Detail.svelte+, web/e2e/task-detail.spec.ts, web/API.md]
 spec: ["Tasks (GTD)", "7. Clients & UI", "3. Data Model"]
 ---

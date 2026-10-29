@@ -3,7 +3,7 @@ id: 036
 title: Add the web capture bar with Ctrl+Space and live token highlighting
 milestone: M2
 status: todo
-deps: [031, 033]
+deps: [031, 033, 037]
 touches: [web/src/capture/CaptureBar.svelte, web/src/capture/CaptureBar.test.ts, web/src/capture/highlight.ts, web/src/capture/highlight.test.ts, web/src/lib/smartadd.ts, web/src/lib/smartadd.test.ts, web/src/Shell.svelte+, web/e2e/capture.spec.ts, web/API.md]
 spec: ["Capture", "7. Clients & UI"]
 ---

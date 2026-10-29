@@ -9,7 +9,7 @@ spec: ["7. Clients & UI", "8. Customization & Accessibility"]
 ---
 
 ## Goal
-Owner request: fix the review nits left open from M0/M1, adding no features. Each fix comes with a test. It has no deps and runs in parallel with every server, parse, CLI and harness task in M2. It overlaps 034/035/036 on `Shell.svelte`/`Detail.svelte` (a normal edit against their `+` entries), so it should land before them.
+Owner request: fix the review nits left open from M0/M1, adding no features. Each fix comes with a test. It has no deps and runs in parallel with every server, parse, CLI and harness task in M2. It overlaps 034/035/036 on `Shell.svelte`/`Detail.svelte` (a normal edit against their `+` entries), so they list it in their deps.
 
 ## Acceptance criteria
 - [ ] 1. After a successful login, the Shell's `command` input has focus (`document.activeElement`), not `body`. Tested in `App.test.ts`.

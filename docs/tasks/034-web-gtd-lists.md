@@ -3,7 +3,7 @@ id: 034
 title: Add web GTD lists, project view with sections, and task rows
 milestone: M2
 status: todo
-deps: [026, 027, 028, 033]
+deps: [026, 027, 028, 033, 037]
 touches: [web/src/tasks/Nav.svelte, web/src/tasks/TaskList.svelte, web/src/tasks/TaskRow.svelte, web/src/tasks/ProjectView.svelte, web/src/tasks/route.ts, web/src/tasks/TaskList.test.ts, web/src/tasks/ProjectView.test.ts, web/src/tasks/route.test.ts, web/src/lib/tasks.ts, web/src/lib/tasks.test.ts, web/src/lib/projects.ts, web/src/lib/projects.test.ts, web/src/Shell.svelte+, web/e2e/lists.spec.ts, web/API.md]
 spec: ["Tasks (GTD)", "7. Clients & UI"]
 ---

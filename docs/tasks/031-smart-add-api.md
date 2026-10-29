@@ -23,7 +23,7 @@ One line of text becomes a fully filled-in task in a single call. A separate par
   - An empty title after parsing gets `400 {"error":"title must be 1 to 1000 characters"}`.
 - [ ] `smartadd::add(&Db, text, today) -> Result<Task, ApiError>` is public and documented, so Telegram (M10) reuses it.
 - [ ] `cargo test -p polykov-server --test smartadd` covers:
-  - the spec example `call mom tmrw 5pm 30m p2 #family every sunday` → all fields, appearing in `GET /api/lists/upcoming`
+  - the spec example `call mom tmrw 5pm 30m p2 #family every sunday` with `today=2026-10-30` → title `call mom`, `scheduled` `2026-10-31T17:00`, `estimate` 30, `priority` 2, `tags` `["family"]`, `recurrence` `{"rule":"FREQ=WEEKLY;BYDAY=SU","from":"scheduled"}`, and `deadline`/`project_id`/`area_id` `null`. It appears in `GET /api/lists/upcoming?today=2026-10-30`
   - project and area resolution
   - both 400s
   - UTF-16 offsets
