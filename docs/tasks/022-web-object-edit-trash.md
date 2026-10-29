@@ -2,7 +2,7 @@
 id: 022
 title: Add web object editing, pin/archive/delete and the trash view
 milestone: M1
-status: todo
+status: done
 deps: [017, 021]
 touches: [web/src/objects/Detail.svelte, web/src/objects/Detail.test.ts, web/src/objects/TagsEditor.svelte, web/src/objects/PropsEditor.svelte, web/src/objects/Trash.svelte, web/src/objects/Trash.test.ts, web/src/objects/List.svelte, web/src/lib/trash.ts, web/src/lib/trash.test.ts, web/src/Shell.svelte, web/API.md]
 spec: ["7. Clients & UI", "3. Data Model", "Organization"]
@@ -26,4 +26,8 @@ From the detail page the owner can edit an object, pin, archive or delete it, an
 - Links, comments (023) and attachments (024).
 
 ## Notes for next
-<!-- builder fills in -->
+- `route.ts` (trash route) and `Shell.test.ts` were edited outside `touches`: the `#/trash` route lives in `parseHash`, and the Shell owns the `moved to trash` note.
+- `PropsEditor` keeps a line's old value when its text is unchanged, so arrays, `null` and numeric-looking strings survive an edit; new or changed values parse like CLI `--prop`.
+- Detail's window `Esc` skips events with `defaultPrevented`; editors (title, tags, properties) `preventDefault` the Esc they use to cancel. 023/024 panels should follow this.
+- The `moved to trash` note sits in Shell above the list and clears once the route leaves the list.
+- Trash confirm steps focus `[ no ]`; Esc cancels a pending confirm before it leaves the view.

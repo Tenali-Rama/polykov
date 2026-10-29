@@ -101,4 +101,34 @@ describe('hash routes', () => {
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     expect(await screen.findByRole('heading', { name: 'Opened' })).toBeInTheDocument();
   });
+
+  it('the list links to #/trash, which shows the trash view', async () => {
+    stubApi({ ...routes, 'GET /api/trash': () => Response.json({ objects: [] }) });
+    location.hash = '#/';
+    render(Shell, { props });
+    expect(await screen.findByRole('link', { name: 'trash' })).toHaveAttribute('href', '#/trash');
+    location.hash = '#/trash';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(await screen.findByText('trash is empty')).toBeInTheDocument();
+  });
+
+  it('delete on the detail returns to the list with moved to trash, cleared on leaving it', async () => {
+    stubApi({ ...routes, 'DELETE /api/objects/4': () => new Response(null, { status: 204 }) });
+    location.hash = '#/o/4';
+    render(Shell, { props });
+    await fireEvent.click(await screen.findByRole('button', { name: '[ delete ]' }));
+    expect(await screen.findByText('moved to trash')).toBeInTheDocument();
+    expect(location.hash).toBe('#/');
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(await screen.findByRole('link', { name: /Listed/ })).toBeInTheDocument();
+    expect(screen.getByText('moved to trash')).toBeInTheDocument();
+
+    location.hash = '#/o/4';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await screen.findByRole('heading', { name: 'Opened' });
+    location.hash = '#/';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await screen.findByRole('link', { name: /Listed/ });
+    expect(screen.queryByText('moved to trash')).not.toBeInTheDocument();
+  });
 });
