@@ -10,6 +10,7 @@ use crate::error::Error;
 
 pub mod login;
 pub mod logout;
+pub mod object;
 pub mod status;
 
 /// What a command prints: `human` as text, or `json` (one object) under `--json`.
