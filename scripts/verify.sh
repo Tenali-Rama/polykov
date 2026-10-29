@@ -21,6 +21,7 @@ step() {
 }
 
 step tasks scripts/factory/board.sh --check
+step board-test scripts/factory/test-board.sh
 step size scripts/factory/check-size.sh
 
 if [ -f Cargo.toml ]; then

@@ -19,6 +19,7 @@ Self-hosted, single-user productivity app. `spec.md` defines *what* to build. Th
 - `scripts/verify.sh`: the one check that counts; CI runs the same script. Prints one line per step, with full logs in `.factory/logs/`.
 - `scripts/factory/board.sh [--ready|--check]`: task status table.
 - `scripts/factory/spec.sh "<heading>"`: print a single spec section.
+- `scripts/factory/board.sh --overlap <ids>`: can these tasks run in parallel?
 
 ## Context rules (everyone)
 - Load only what the task needs, in this order:

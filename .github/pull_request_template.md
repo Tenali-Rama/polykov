@@ -10,7 +10,7 @@
 | 1 |           |             |        |
 
 ## Verify
-`scripts/factory/clean-verify.sh origin/<branch>` → VERIFY: PASS
+`scripts/verify.sh` (local) → VERIFY: PASS. PR CI → success
 
 ## Decisions / risks / out-of-touches changes
 -
