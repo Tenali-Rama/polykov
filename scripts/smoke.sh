@@ -56,6 +56,10 @@ POLYKOV_PASSWORD="$PASSWORD" "$CLI" login >"$tmp/login.out" 2>&1 || fail "polyko
 "$CLI" status --json >"$tmp/status.json" 2>&1 || fail "polykov status failed: $(tail -n 1 "$tmp/status.json")"
 jq -e '.token == "valid"' "$tmp/status.json" >/dev/null || fail "polykov status token not valid: $(cat "$tmp/status.json")"
 
+"$CLI" new note smoke --tag smoke >"$tmp/new.out" 2>&1 || fail "polykov new failed: $(tail -n 1 "$tmp/new.out")"
+"$CLI" ls --tag smoke --json >"$tmp/ls.json" 2>&1 || fail "polykov ls failed: $(tail -n 1 "$tmp/ls.json")"
+jq -e '.total == 1' "$tmp/ls.json" >/dev/null || fail "polykov ls --tag smoke: expected total 1: $(cat "$tmp/ls.json")"
+
 session=$(sed -n 's/^token = "\(.*\)"$/\1/p' "$tmp/config/polykov/cli.toml" 2>/dev/null)
 [ -n "$session" ] || fail "no token in CLI config after login"
 

@@ -2,7 +2,7 @@
 id: 018
 title: Add CLI object commands new, show, ls, edit, rm, pin and archive
 milestone: M1
-status: todo
+status: done
 deps: [014]
 touches: [cli/src/cmd/object/, cli/src/cmd/mod.rs+, cli/src/main.rs+, cli/src/client.rs, cli/tests/object.rs, cli/tests/cli.rs+, cli/API.md, scripts/smoke.sh]
 spec: ["7. Clients & UI", "3. Data Model"]
@@ -31,4 +31,8 @@ The owner can do full object CRUD from the terminal, with `--json` on every comm
 - Links, comments, trash (019) and attachments (020).
 
 ## Notes for next
-<!-- builder fills in -->
+- `cmd/object/` holds every object command; `flag.rs` covers pin/unpin/archive/unarchive. Commands with flags embed a `clap::Args` struct in `main`'s `Command` variant.
+- `ls` human format: pinned ids carry a `*` prefix (`*3  note  Title  #tag`); a paged list ends with `(n of total shown)`, an empty one prints `no objects`.
+- `show` lists properties as `.key` rows after the fixed fields; strings print unquoted, other values as JSON.
+- `Client::put` has no caller yet (`#[allow(dead_code)]` until `polykov link`, task 019, uses it); remove the allow there.
+- `--prop` floats that are not finite (`inf`, `nan`) stay strings, since JSON can't hold them.

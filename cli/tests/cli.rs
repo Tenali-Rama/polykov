@@ -31,7 +31,24 @@ fn help_lists_implemented_subcommands_and_global_flags() {
         .lines()
         .filter_map(|l| l.split_whitespace().next())
         .collect();
-    assert_eq!(commands, ["login", "logout", "status", "help"]);
+    assert_eq!(
+        commands,
+        [
+            "login",
+            "logout",
+            "status",
+            "new",
+            "show",
+            "ls",
+            "edit",
+            "rm",
+            "pin",
+            "unpin",
+            "archive",
+            "unarchive",
+            "help"
+        ]
+    );
     assert!(stdout.contains("--server <URL>"));
     assert!(stdout.contains("--json"));
 }

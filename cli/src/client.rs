@@ -3,7 +3,8 @@
 use std::time::Duration;
 
 use serde_json::Value;
-use ureq::{Agent, http::Response};
+use ureq::typestate::WithBody;
+use ureq::{Agent, RequestBuilder, http::Response};
 
 use crate::error::Error;
 
@@ -38,19 +39,38 @@ impl Client {
     }
 
     pub fn get(&self, path: &str) -> Result<Reply, Error> {
-        let mut req = self.agent.get(self.url(path));
-        if let Some(token) = &self.token {
-            req = req.header("Authorization", format!("Bearer {token}"));
-        }
-        self.reply(req.call())
+        self.reply(self.auth(self.agent.get(self.url(path))).call())
+    }
+
+    pub fn delete(&self, path: &str) -> Result<Reply, Error> {
+        self.reply(self.auth(self.agent.delete(self.url(path))).call())
     }
 
     /// POSTs `body` as JSON, or an empty body if `None`.
     pub fn post(&self, path: &str, body: Option<&Value>) -> Result<Reply, Error> {
-        let mut req = self.agent.post(self.url(path));
-        if let Some(token) = &self.token {
-            req = req.header("Authorization", format!("Bearer {token}"));
+        self.send(self.agent.post(self.url(path)), body)
+    }
+
+    /// PUTs `body` as JSON, or an empty body if `None`.
+    #[allow(dead_code)] // First used by `polykov link` (task 019).
+    pub fn put(&self, path: &str, body: Option<&Value>) -> Result<Reply, Error> {
+        self.send(self.agent.put(self.url(path)), body)
+    }
+
+    /// PATCHes `body` as JSON.
+    pub fn patch(&self, path: &str, body: &Value) -> Result<Reply, Error> {
+        self.send(self.agent.patch(self.url(path)), Some(body))
+    }
+
+    fn auth<B>(&self, req: RequestBuilder<B>) -> RequestBuilder<B> {
+        match &self.token {
+            Some(token) => req.header("Authorization", format!("Bearer {token}")),
+            None => req,
         }
+    }
+
+    fn send(&self, req: RequestBuilder<WithBody>, body: Option<&Value>) -> Result<Reply, Error> {
+        let req = self.auth(req);
         let res = match body {
             Some(body) => req.send_json(body),
             None => req.send_empty(),

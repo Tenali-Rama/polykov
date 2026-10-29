@@ -3,6 +3,8 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use serde_json::json;
 
+use cmd::object::flag::Flag;
+
 mod client;
 mod cmd;
 mod config;
@@ -32,6 +34,24 @@ enum Command {
     Logout,
     /// Show server version, database state and whether the stored token is valid
     Status,
+    /// Create an object and print its id
+    New(cmd::object::new::Args),
+    /// Show one object
+    Show { id: u64 },
+    /// List objects (unarchived by default), pinned first
+    Ls(cmd::object::ls::Args),
+    /// Change an object's title, tags or properties
+    Edit(cmd::object::edit::Args),
+    /// Move an object to the trash
+    Rm { id: u64 },
+    /// Pin an object
+    Pin { id: u64 },
+    /// Unpin an object
+    Unpin { id: u64 },
+    /// Archive an object
+    Archive { id: u64 },
+    /// Unarchive an object
+    Unarchive { id: u64 },
 }
 
 fn main() -> ExitCode {
@@ -40,6 +60,15 @@ fn main() -> ExitCode {
         Command::Login => cmd::login::run(&ctx),
         Command::Logout => cmd::logout::run(&ctx),
         Command::Status => cmd::status::run(&ctx),
+        Command::New(args) => cmd::object::new::run(&ctx, args),
+        Command::Show { id } => cmd::object::show::run(&ctx, id),
+        Command::Ls(args) => cmd::object::ls::run(&ctx, args),
+        Command::Edit(args) => cmd::object::edit::run(&ctx, args),
+        Command::Rm { id } => cmd::object::rm::run(&ctx, id),
+        Command::Pin { id } => cmd::object::flag::run(&ctx, id, Flag::Pinned, true),
+        Command::Unpin { id } => cmd::object::flag::run(&ctx, id, Flag::Pinned, false),
+        Command::Archive { id } => cmd::object::flag::run(&ctx, id, Flag::Archived, true),
+        Command::Unarchive { id } => cmd::object::flag::run(&ctx, id, Flag::Archived, false),
     });
     match result {
         Ok(out) if cli.json => println!("{}", out.json),
