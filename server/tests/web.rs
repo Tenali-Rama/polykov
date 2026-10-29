@@ -123,7 +123,14 @@ async fn unknown_non_api_paths_fall_back_to_index_html() {
 #[tokio::test]
 async fn unknown_api_and_health_paths_return_json_404() {
     let (root, db) = Root::new("api404", true);
-    for path in ["/api", "/api/no-such", "/api/setup/extra", "/health/extra"] {
+    for path in [
+        "/api",
+        "/api/",
+        "/api/no-such",
+        "/api/setup/extra",
+        "/health/",
+        "/health/extra",
+    ] {
         let r = get(&db, &root.web_dir(), path).await;
         assert_eq!(r.status, StatusCode::NOT_FOUND, "{path}");
         let body: Value = serde_json::from_str(&r.body).unwrap();
@@ -166,7 +173,8 @@ async fn path_traversal_cannot_read_outside_web_dir() {
             !r.body.contains("outside web_dir"),
             "{path} leaked config.toml"
         );
-        assert_ne!(r.status, StatusCode::INTERNAL_SERVER_ERROR, "{path}");
+        assert_eq!(r.status, StatusCode::OK, "{path}");
+        assert_eq!(r.body, INDEX, "{path}");
     }
 }
 
