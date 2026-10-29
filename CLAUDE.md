@@ -39,8 +39,8 @@ Self-hosted, single-user productivity app. `spec.md` defines *what* to build. Th
 - Read `docs/factory/LESSONS.md` before building.
 
 ## Git
-- No PRs and no GitHub token. Git goes over SSH with the deploy key (remote `origin`).
-- Never commit or push to main. Work on `task/NNN-slug` (or `plan/*`, `chore/*`, `fix/*`). Only the reviewer merges, and only through `scripts/factory/merge.sh`.
-- CI runs on every pushed branch. Read the result with `scripts/factory/ci-status.sh <ref> [--wait]`.
+- Never commit or push to main; `main` is protected. Work on `task/NNN-slug` (or `plan/*`, `chore/*`, `fix/*`), open a PR, and the reviewer merges it once CI is green.
+- Git goes over SSH with the deploy key (remote `origin`). `gh` targets the repo through `GH_REPO`, set in `.claude/settings.json`.
+- `scripts/factory/clean-verify.sh <ref>` runs verify in a fresh checkout: the local stand-in for CI.
 - Author is always `Tenali-Rama <tenalirama.krishna125@gmail.com>`, set in repo config.
-- Never put AI attribution or co-author lines in commits. A git hook, a Claude hook, and CI all enforce this.
+- Never put AI attribution or co-author lines in commits or PRs. A git hook, a Claude hook, and CI all enforce this.

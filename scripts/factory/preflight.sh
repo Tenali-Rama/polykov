@@ -8,6 +8,11 @@ check() {
   if "$@" >/dev/null 2>&1; then echo "OK   $name"; else echo "FAIL $name — fix: $fix"; fail=1; fi
 }
 
+export GH_REPO=${GH_REPO:-Tenali-Rama/polykov}
+check "gh installed"        "run scripts/factory/bootstrap.sh"          command -v gh
+check "gh authenticated"    "owner: gh auth login --with-token (fine-grained PAT)" gh auth status
+check "gh repo access"      "token needs access to $GH_REPO"            gh repo view "$GH_REPO"
+check "main protected"      "owner: scripts/factory/protect-main.sh"    gh api "repos/$GH_REPO/branches/main/protection"
 check "cargo installed"     "run scripts/factory/bootstrap.sh"          command -v cargo
 check "node installed"      "install Node 22"                           command -v node
 check "jq installed"        "run scripts/factory/bootstrap.sh"          command -v jq
@@ -18,7 +23,5 @@ check "on main, clean tree" "commit/stash local changes, git switch main" \
   bash -c '[ "$(git rev-parse --abbrev-ref HEAD)" = main ] && [ -z "$(git status --porcelain)" ]'
 check "main up to date"     "git pull --ff-only"                        git pull --ff-only -q
 check "board valid"         "fix task frontmatter (board.sh --check)"   scripts/factory/board.sh --check
-check "CI reporting works"  "CI must publish refs/ci/* (check Actions tab on GitHub)" \
-  bash -c '[ -n "$(git ls-remote origin "refs/ci/*")" ]'
-mkdir -p .factory/reviews
+mkdir -p .factory
 exit $fail

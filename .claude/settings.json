@@ -1,5 +1,8 @@
 {
   "includeCoAuthoredBy": false,
+  "env": {
+    "GH_REPO": "Tenali-Rama/polykov"
+  },
   "hooks": {
     "PreToolUse": [
       {
