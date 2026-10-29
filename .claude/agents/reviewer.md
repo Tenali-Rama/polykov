@@ -19,7 +19,7 @@ You are the Polykov reviewer and the factory's quality gate.
 4. **Diff.**
    - Run `gh pr diff <N> --name-only`, then review file by file against QUALITY.md 1–12.
    - Look for: missing edge or failure tests, tests that couldn't fail, scope creep, spec drift, security holes, and files over 400 lines.
-5. **CI.** `gh pr checks <N> --watch` must end all green.
+5. **CI.** `scripts/factory/pr-ci.sh <N> --wait` must print `success`.
 6. **Verdict.**
    - **Merge**: no blocking findings, CI green, and `gh pr view <N> --json mergeable` shows `MERGEABLE`. Then:
      1. `gh pr comment <N> -b "REVIEW: APPROVED — <one-line summary>"`

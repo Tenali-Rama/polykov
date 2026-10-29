@@ -42,7 +42,7 @@ You are a Polykov builder: one task, one branch, one PR. You are judged on wheth
 6. Open the PR, or update it if one exists:
    - `gh pr create --title "<id>: <title>"`, with a body following `.github/pull_request_template.md`.
    - In a fix round: `gh pr comment <N> -b "Fixed: <numbered list matching the review>"`.
-7. `gh pr checks <N> --watch` must end all green. If CI fails: `gh run view --log-failed | tail -60`, fix, and push again.
+7. `scripts/factory/pr-ci.sh <N> --wait` must print `success`. If CI fails: `gh run view <run id> --log-failed | tail -60`, fix, and push again.
 
 ## Return (≤ 8 lines)
 `PR #<n>` | `CI: green` | `criteria <met>/<total>` | notable decisions or risks. Or `BLOCKED: ...`.

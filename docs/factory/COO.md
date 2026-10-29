@@ -45,9 +45,9 @@ When the owner says "start building", "resume", or starts a new session with you
 4. Enter the loop.
 
 ## The loop
-0. **Main must be green.** Before each dispatch, run `gh run list --branch main --workflow ci --limit 1 --json conclusion -q '.[0].conclusion'`.
+0. **Main must be green.** Before each dispatch, run `scripts/factory/pr-ci.sh main`.
    - `failure` → stop dispatching. Spawn one builder with: `Task: main CI is red. Reproduce with scripts/factory/clean-verify.sh origin/main, fix on branch fix/main-<sha>, and open a PR.` Then review and merge that fix like any task.
-   - Empty (still running) → fine, continue.
+   - `pending` → fine, continue.
 1. **Plan when needed.** If `board.sh --ready` is empty and nothing is in flight:
    - No `docs/tasks/ROADMAP.md`, or the next milestone has no task files → spawn `planner` in the background. Its PR goes through review like any other.
    - All milestones done → report to the owner and stop.
