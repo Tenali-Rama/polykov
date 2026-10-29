@@ -11,6 +11,14 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+rpassword = "7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+ureq = { version = "3", features = ["json"] }
 
 [dev-dependencies]
 assert_cmd = "2"
+axum = "0.8"
+polykov-server = { path = "../server" }
+tokio = { version = "1", features = ["rt", "net"] }

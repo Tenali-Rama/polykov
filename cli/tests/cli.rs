@@ -19,15 +19,24 @@ fn version_prints_crate_version() {
 }
 
 #[test]
-fn help_lists_no_subcommands() {
+fn help_lists_implemented_subcommands_and_global_flags() {
     let stdout = stdout_of(&["--help"]);
-    assert!(
-        !stdout.contains("Commands:"),
-        "unexpected subcommands:\n{stdout}"
-    );
+    let commands: Vec<&str> = stdout
+        .split("Commands:")
+        .nth(1)
+        .unwrap()
+        .split("Options:")
+        .next()
+        .unwrap()
+        .lines()
+        .filter_map(|l| l.split_whitespace().next())
+        .collect();
+    assert_eq!(commands, ["login", "logout", "status", "help"]);
+    assert!(stdout.contains("--server <URL>"));
+    assert!(stdout.contains("--json"));
 }
 
 #[test]
 fn unknown_subcommand_fails() {
-    polykov().arg("status").assert().failure();
+    polykov().arg("frobnicate").assert().failure();
 }
