@@ -2,7 +2,7 @@
 id: 008
 title: Add web setup wizard, login and logout screens
 milestone: M0
-status: todo
+status: done
 deps: [006, 012]
 touches: [web/]
 spec: ["9. Security & Self-Hosting", "7. Clients & UI"]
@@ -25,4 +25,8 @@ Opening the web UI on a fresh install shows a first-run setup screen to set the 
 - TOTP, password change, API token management UI, any app views beyond the shell.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `App.svelte` is now only the router; the signed-in UI lives in `Shell.svelte` (props `onlogout`). New app views go inside `Shell`.
+- Auth calls are in `src/lib/api.ts` (`authState`, `setupOwner`, `login`, `logout`, `post`); `post` surfaces the server's `error` text as the `ApiError` message.
+- The web never reads or stores the login token; the browser sends the HttpOnly cookie on same-origin fetches. A later 401 from any call should route back to login (not handled yet beyond start-up).
+- Setup does not log in: after setup the user lands on login with an `owner created — log in` note (setup creates no session server-side).
+- Reuse `auth/PasswordPrompt.svelte` / `auth/AuthPanel.svelte` for TOTP or password-change screens.
