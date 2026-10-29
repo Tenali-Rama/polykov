@@ -2,7 +2,7 @@
 id: 016
 title: Add attachment upload, download and delete stored in the data dir
 milestone: M1
-status: todo
+status: done
 deps: [013]
 touches: [server/src/attachments/, server/src/db/mod.rs, server/src/lib.rs+, server/src/app.rs+, server/tests/attachments.rs, server/API.md, docs/decisions/]
 spec: ["3. Data Model", "2. Architecture & Stack", "Tasks (GTD)"]
@@ -34,4 +34,8 @@ Any object can have file attachments. Files live in `<data dir>/attachments/`, w
 - Image thumbnails, paste/drop in the note editor (M4), and voice uploads (M11).
 
 ## Notes for next
-<!-- builder fills in -->
+- 017 purge: call `attachments::remove_files(&db, id)` before `DELETE FROM objects` (rows cascade, files don't).
+- `?inline=1` also refuses `image/svg+xml` (scripts on our origin); ADR 0008.
+- A non-ASCII `Content-Type` on upload gets `400 {"error":"Content-Type must be ASCII"}`; a missing `name` is the same 400 as an empty one.
+- `Db` now carries its data dir (`Db::data_dir()`); test `DataDir` does not pre-create `attachments/`, `store::create` makes it on demand.
+- The file write runs while holding the DB mutex (inside the row's transaction); fine for one user, revisit if uploads block other requests.
