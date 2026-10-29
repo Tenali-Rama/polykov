@@ -21,6 +21,9 @@ serde_json = "1"
 toml = "1"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
 rusqlite = { version = "0.41", features = ["bundled"] }
+argon2 = { version = "0.5", features = ["std"] }
+getrandom = "0.3"
+sha2 = "0.10"
 
 [dev-dependencies]
 http-body-util = "0.1"

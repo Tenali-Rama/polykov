@@ -7,7 +7,7 @@ mod tests;
 
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use rusqlite::Connection;
 
@@ -42,6 +42,11 @@ impl Db {
         let conn = self.conn.lock().map_err(|_| Error::Poisoned)?;
         conn.query_row("SELECT MAX(version) FROM schema_version", [], |_| Ok(()))
             .map_err(Error::Sqlite)
+    }
+
+    /// Locks the connection for crate modules that keep their own tables (e.g. `auth`).
+    pub(crate) fn conn(&self) -> Result<MutexGuard<'_, Connection>, Error> {
+        self.conn.lock().map_err(|_| Error::Poisoned)
     }
 }
 
