@@ -11,9 +11,11 @@ mode=${1:-all}
 field() { sed -n '/^---$/,/^---$/p' "$2" | sed -n "s/^$1:[[:space:]]*//p" | head -1; }
 list() { tr -d '[]"' <<<"$1" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | sed '/^$/d'; }
 # Shared files never block parallel work: their rebase conflicts are mechanical (LESSONS.md, Rebase).
-shared() { [[ $1 == Cargo.lock || $1 == API.md || $1 == */API.md || $1 == docs/decisions/* ]]; }
-# Two touches overlap if equal, or if one is a dir (trailing /) that contains the other.
-overlaps() { [[ $1 == "$2" || ($1 == */ && $2 == "$1"*) || ($2 == */ && $1 == "$2"*) ]]; }
+# Callers pass entries with any trailing + and / stripped (norm), so `server/src` and `server/src/` match alike.
+shared() { [[ $1 == Cargo.lock || $1 == API.md || $1 == */API.md || $1 == docs/decisions || $1 == docs/decisions/* ]]; }
+# Two touches overlap if equal, or if one is a path prefix of the other (a dir containing it).
+overlaps() { [[ $1 == "$2" || $2 == "$1"/* || $1 == "$2"/* ]]; }
+norm() { local e=${1%+}; while [[ $e == */ ]]; do e=${e%/}; done; echo "$e"; }
 
 shopt -s nullglob
 files=(docs/tasks/[0-9]*.md)
@@ -31,7 +33,8 @@ if [ "$mode" = --overlap ]; then
         for q in $(list "${touch[${ids[j]}]}"); do
           # A trailing + marks an append-only edit (one registration line); two of those never clash.
           [[ $p == *+ && $q == *+ ]] && continue
-          if ! shared "${p%+}" && ! shared "${q%+}" && overlaps "${p%+}" "${q%+}"; then
+          a=$(norm "$p"); b=$(norm "$q")
+          if ! shared "$a" && ! shared "$b" && overlaps "$a" "$b"; then
             echo "${ids[i]} ${ids[j]}: $p ~ $q"; hit=1
           fi
         done
@@ -52,6 +55,9 @@ for f in "${files[@]}"; do
     case $st in todo|done|dropped) ;; *) echo "$f: bad status '$st'"; errors=1 ;; esac
     for d in $(list "$deps"); do
       [ -n "${status[$d]+x}" ] || { echo "$f: unknown dep '$d'"; errors=1; }
+    done
+    for e in $(list "${touch[$id]}"); do
+      if [[ ${e%+} != */ && -d ${e%+} ]]; then echo "$f: touches dir '$e' needs a trailing /"; errors=1; fi
     done
     while IFS= read -r h; do
       scripts/factory/spec.sh "$h" >/dev/null 2>&1 || { echo "$f: spec heading not found: $h"; errors=1; }
