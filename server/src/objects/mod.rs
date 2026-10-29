@@ -1,6 +1,7 @@
-//! Generic objects (spec §3): `POST /api/objects` and `GET`/`PATCH`/`DELETE
+//! Generic objects (spec §3): `GET`/`POST /api/objects` and `GET`/`PATCH`/`DELETE
 //! /api/objects/{id}`. Every route requires auth. Delete moves an object to the trash.
 
+mod list;
 pub mod store;
 pub mod validate;
 
@@ -17,13 +18,14 @@ use crate::{
     auth::Session,
     db::Db,
     http::{ApiError, blocking},
+    tags,
 };
 use store::{Changes, New, Object};
 
 /// The object routes, merged by `app::router`.
 pub fn routes() -> Router<Db> {
     Router::new()
-        .route("/api/objects", post(create))
+        .route("/api/objects", post(create).get(list::list))
         .route("/api/objects/{id}", get(read).patch(update).delete(remove))
 }
 
@@ -39,6 +41,8 @@ struct NewBody {
     pinned: bool,
     #[serde(default)]
     archived: bool,
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 /// Body of `PATCH /api/objects/{id}`. A field that is present must not be `null`.
@@ -53,6 +57,8 @@ struct PatchBody {
     pinned: Option<bool>,
     #[serde(default, deserialize_with = "present")]
     archived: Option<bool>,
+    #[serde(default, deserialize_with = "present")]
+    tags: Option<Vec<String>>,
 }
 
 /// Deserializes a present field as `Some`, so an explicit `null` is not mistaken for absent.
@@ -79,6 +85,7 @@ async fn create(
         r#type: body.r#type,
         pinned: body.pinned,
         archived: body.archived,
+        tags: tags::normalize_all(&body.tags)?,
     };
     let object = blocking(move || store::create(&db, &new)).await?;
     Ok((StatusCode::CREATED, Json(object)))
@@ -106,6 +113,7 @@ async fn update(
         properties: body.properties.map(validate::properties).transpose()?,
         pinned: body.pinned,
         archived: body.archived,
+        tags: body.tags.as_deref().map(tags::normalize_all).transpose()?,
     };
     blocking(move || store::update(&db, id, &changes))
         .await?

@@ -2,7 +2,7 @@
 id: 014
 title: Add hierarchical tags and the filtered object list
 milestone: M1
-status: todo
+status: done
 deps: [013]
 touches: [server/src/tags/, server/src/objects/, server/src/lib.rs+, server/src/app.rs+, server/tests/tags.rs, server/tests/object_list.rs, server/API.md]
 spec: ["3. Data Model", "Organization"]
@@ -36,4 +36,8 @@ Objects carry hierarchical tags that act as folders, and the owner can list obje
 - Full-text search, the view query language and saved views (M3). Renaming tags.
 
 ## Notes for next
-<!-- builder fills in -->
+- Defaults chosen: normalize = trim, strip one leading `#`, lowercase (so `" #Work"` works); more than 50 distinct tags gets `400 an object can have at most 50 tags`; an unknown list query parameter gets axum's standard `400`; `limit=0` is rejected.
+- `GET /api/tags` lists only folders used by live, non-archived objects, so no entry ever has `count: 0`.
+- Tag prefix filter uses the range `tag >= t||'/' AND tag < t||'0'` on the existing `object_tags_tag` index (no migration); M3 view queries (`tag:work/*`) can reuse `tags::store::under`.
+- Object JSON reads tags via `json_group_array(tag ORDER BY tag)` (`tags::store::SORTED_JSON`), needs SQLite ≥ 3.44 (bundled is newer).
+- The 10k timing assert only runs under `cargo test --release`; verify runs debug, so it only checks correctness there.
