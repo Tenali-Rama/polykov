@@ -3,8 +3,8 @@ id: 008
 title: Add web setup wizard, login and logout screens
 milestone: M0
 status: todo
-deps: [004, 006]
-touches: [web/src/]
+deps: [006, 012]
+touches: [web/]
 spec: ["9. Security & Self-Hosting", "7. Clients & UI"]
 ---
 

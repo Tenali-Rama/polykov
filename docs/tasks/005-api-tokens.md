@@ -3,13 +3,13 @@ id: 005
 title: Add long-lived API tokens for scripts and clients
 milestone: M0
 status: todo
-deps: [004]
+deps: [012]
 touches: [server/src/auth/, server/migrations/, server/src/app.rs, server/tests/, server/API.md]
 spec: ["9. Security & Self-Hosting"]
 ---
 
 ## Goal
-The owner can create, list and revoke named API tokens that authenticate exactly like a session bearer token.
+The owner can create, list and revoke named API tokens that authenticate exactly like a session bearer token, through the extractor from 012.
 
 ## Acceptance criteria
 - [ ] `POST /api/tokens {"name":"..."}` (auth required) returns 201 with `{"id":...,"name":"...","token":"..."}`; the plain token is shown only in this response and stored only as a hash

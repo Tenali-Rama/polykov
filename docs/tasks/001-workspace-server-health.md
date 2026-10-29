@@ -13,10 +13,12 @@ A Cargo workspace exists with two crates: `server/` (package and binary `polykov
 
 ## Acceptance criteria
 - [ ] Root `Cargo.toml` is a workspace with members `server` and `cli`. `cargo build --workspace` produces `target/debug/polykov-server` and `target/debug/polykov`
-- [ ] The router is built in a function separate from `main` (e.g. `server/src/app.rs`) so integration tests can call it without binding a port
+- [ ] `server` has both a lib target (`server/src/lib.rs`, crate `polykov_server`) and the binary; `server/tests/` and the CLI's dev-dependency (task 009) use the lib
+- [ ] The router is built by `polykov_server::app::router()` in `server/src/app.rs`, separate from `main`, so integration tests can call it without binding a port
+- [ ] The `/health` handler lives in `server/src/app.rs` (task 003 changes it there)
 - [ ] `polykov-server` listens on `127.0.0.1:7700` by default (default — owner may change); `--bind <addr>` overrides it
 - [ ] `curl -s localhost:7700/health` returns 200 with `{"status":"ok","version":"<crate version>"}`
-- [ ] Integration test `server/tests/health.rs` checks the 200 and the JSON body, and checks that an unknown path returns 404
+- [ ] Integration test `server/tests/health.rs` checks the 200 and the JSON body, and checks that an unknown path returns 404 (task 007 changes this to `/api/<unknown>` once the SPA fallback exists)
 - [ ] `polykov --version` prints the version; `polykov --help` lists no unimplemented subcommands
 - [ ] `server/CLAUDE.md`, `server/API.md`, `cli/CLAUDE.md`, `cli/API.md` exist (each ≤ 30 lines); `server/API.md` documents `/health`
 - [ ] ADR `docs/decisions/0001-workspace-layout.md` records the crate layout and the default port

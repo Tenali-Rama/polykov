@@ -3,7 +3,7 @@ id: 009
 title: Build the CLI skeleton with login, logout and status
 milestone: M0
 status: todo
-deps: [004]
+deps: [012]
 touches: [cli/, Cargo.lock]
 spec: ["7. Clients & UI", "2. Architecture & Stack", "9. Security & Self-Hosting"]
 ---
