@@ -8,8 +8,10 @@ use rusqlite::{Connection, OptionalExtension};
 use super::Error;
 
 /// All migrations, in order. Versions start at 1 and have no gaps.
-pub(super) const MIGRATIONS: &[(u32, &str)] =
-    &[(1, include_str!("../../migrations/0001_schema_version.sql"))];
+pub(super) const MIGRATIONS: &[(u32, &str)] = &[
+    (1, include_str!("../../migrations/0001_schema_version.sql")),
+    (2, include_str!("../../migrations/0002_owner_sessions.sql")),
+];
 
 /// The schema version this binary migrates to.
 pub fn latest() -> u32 {

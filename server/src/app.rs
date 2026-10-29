@@ -3,11 +3,14 @@
 use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
 use serde_json::{Value, json};
 
-use crate::db::Db;
+use crate::{auth, db::Db};
 
 /// Builds the full HTTP router over `db`. Binds no port, so tests can drive it directly.
 pub fn router(db: Db) -> Router {
-    Router::new().route("/health", get(health)).with_state(db)
+    Router::new()
+        .route("/health", get(health))
+        .merge(auth::routes())
+        .with_state(db)
 }
 
 async fn health(State(db): State<Db>) -> (StatusCode, Json<Value>) {
