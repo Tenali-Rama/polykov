@@ -1,0 +1,13 @@
+services:
+  polykov:
+    build: .
+    image: polykov
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    volumes:
+      - polykov-data:/data
+
+volumes:
+  polykov-data:
+    name: polykov-data
