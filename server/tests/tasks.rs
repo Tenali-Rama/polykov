@@ -177,7 +177,6 @@ async fn patch_rejects_status_completed_and_null_for_required_fields() {
         json!({ "completed": null }),
         json!({ "priority": null }),
         json!({ "checklist": null }),
-        json!({ "recurrence": null }),
     ] {
         let res = patch_task(&db, &auth, id, task.clone()).await;
         assert_eq!(res.status, StatusCode::UNPROCESSABLE_ENTITY, "{task}");

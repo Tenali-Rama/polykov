@@ -9,6 +9,7 @@ pub mod db;
 pub mod http;
 pub mod links;
 pub mod objects;
+pub mod recur;
 pub mod tags;
 pub mod tasks;
 pub mod trash;

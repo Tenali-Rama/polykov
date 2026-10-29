@@ -5,7 +5,10 @@ use rusqlite::{Connection, OptionalExtension, Row, Transaction, params, types::T
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
-use super::validate;
+use super::{
+    recurrence::{self, Recurrence},
+    validate,
+};
 use crate::{
     db::{self, Db},
     http::ApiError,
@@ -36,7 +39,7 @@ pub struct Fields {
     pub section_id: Option<i64>,
     pub area_id: Option<i64>,
     pub checklist: Vec<ChecklistItem>,
-    pub recurrence: Option<Value>,
+    pub recurrence: Option<Recurrence>,
     pub completed: Option<String>,
 }
 
@@ -74,6 +77,8 @@ pub struct FieldChanges {
     pub area_id: Option<Option<i64>>,
     #[serde(default, deserialize_with = "present")]
     pub checklist: Option<Vec<ChecklistItem>>,
+    #[serde(default, deserialize_with = "nullable")]
+    pub recurrence: Option<Option<Recurrence>>,
 }
 
 /// A present field must not be `null`.
@@ -100,6 +105,7 @@ impl FieldChanges {
             && self.section_id.is_none()
             && self.area_id.is_none()
             && self.checklist.is_none()
+            && self.recurrence.is_none()
     }
 }
 
@@ -194,18 +200,6 @@ pub fn update(db: &Db, id: i64, changes: &Changes) -> Result<Option<Task>, ApiEr
     Ok(select(&conn, id)?)
 }
 
-/// Marks the live task `id` done now and returns it, or `None` if there is no such task.
-/// A task that is already done is left as it is.
-pub fn complete(db: &Db, id: i64) -> Result<Option<Task>, db::Error> {
-    set_status(
-        db,
-        id,
-        "INSERT INTO tasks (object_id, status, completed) VALUES (?1, 'done', unixepoch()) \
-         ON CONFLICT (object_id) DO UPDATE SET status = 'done', completed = unixepoch() \
-         WHERE tasks.status <> 'done'",
-    )
-}
-
 /// Marks the live task `id` open, clearing `completed`, and returns it, or `None` if there
 /// is no such task. A task that is already open is left as it is.
 pub fn reopen(db: &Db, id: i64) -> Result<Option<Task>, db::Error> {
@@ -293,18 +287,27 @@ fn write_fields(
     if let Some(checklist) = &changes.checklist {
         fields.checklist = validate::checklist(checklist)?;
     }
+    if let Some(change) = &changes.recurrence {
+        fields.recurrence = change.as_ref().map(recurrence::validate).transpose()?;
+    }
     let checklist = serde_json::to_string(&fields.checklist)
         .map_err(|e| ApiError::Internal(format!("checklist encoding failed: {e}")))?;
+    let recurrence = fields
+        .recurrence
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(|e| ApiError::Internal(format!("recurrence encoding failed: {e}")))?;
     tx.execute(
         "INSERT INTO tasks (object_id, priority, scheduled, deadline, estimate, someday, \
-         parent_id, project_id, section_id, area_id, checklist) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) \
+         parent_id, project_id, section_id, area_id, checklist, recurrence) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) \
          ON CONFLICT (object_id) DO UPDATE SET priority = excluded.priority, \
          scheduled = excluded.scheduled, deadline = excluded.deadline, \
          estimate = excluded.estimate, someday = excluded.someday, \
          parent_id = excluded.parent_id, project_id = excluded.project_id, \
          section_id = excluded.section_id, area_id = excluded.area_id, \
-         checklist = excluded.checklist",
+         checklist = excluded.checklist, recurrence = excluded.recurrence",
         params![
             id,
             fields.priority,
@@ -316,18 +319,19 @@ fn write_fields(
             fields.project_id,
             fields.section_id,
             fields.area_id,
-            checklist
+            checklist,
+            recurrence
         ],
     )
     .map_err(db::Error::Sqlite)?;
     Ok(())
 }
 
-fn missing() -> db::Error {
+pub(super) fn missing() -> db::Error {
     db::Error::Sqlite(rusqlite::Error::QueryReturnedNoRows)
 }
 
-fn select(conn: &Connection, id: i64) -> Result<Option<Task>, db::Error> {
+pub(super) fn select(conn: &Connection, id: i64) -> Result<Option<Task>, db::Error> {
     conn.query_row(
         &format!(
             "SELECT {}, COALESCE(t.status, 'open'), COALESCE(t.priority, 4), t.scheduled, \

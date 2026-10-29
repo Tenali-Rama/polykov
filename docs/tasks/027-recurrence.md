@@ -2,7 +2,7 @@
 id: 027
 title: Add recurring tasks with fixed-date and after-completion rules
 milestone: M2
-status: todo
+status: done
 deps: [025]
 touches: [server/src/recur/, server/src/tasks/, server/src/lib.rs+, server/tests/recurrence.rs, server/API.md, docs/decisions/]
 spec: ["Tasks (GTD)", "10. Non-Functional"]
@@ -37,4 +37,8 @@ A task can carry a recurrence rule. Completing it creates the next occurrence, c
 - Parsing natural-language recurrence like "every sunday" (029/031). Reminders for recurring tasks (M9).
 
 ## Notes for next
-<!-- builder fills in -->
+- Spawn logic lives in `server/src/tasks/recurrence.rs` (`complete` moved there from `store.rs`, which is at 375 lines); `store::select`/`missing` are now `pub(super)`.
+- Defaults chosen: rules parse case-insensitively; the next task's `scheduled` keeps the old `scheduled`'s time (a deadline-anchored one is date-only); `pinned`, links, comments, attachments and sub-tasks are not copied; a next date past 9999 is a 400 and leaves the task open.
+- Without `BYMONTHDAY`, a monthly series started on the 31st drifts to the clamped day (ADR 0013); 029/031 should emit `BYMONTHDAY` for "every month on the 31st".
+- `?today=` lets clients (and tests) pass the local day; until a time zone setting exists the default is the server's UTC date.
+- `tests/tasks.rs` lost its `"recurrence": null` → 422 case, since the field is now accepted.
