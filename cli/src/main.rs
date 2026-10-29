@@ -61,6 +61,9 @@ enum Command {
     /// List, restore or permanently delete trashed objects
     #[command(subcommand)]
     Trash(cmd::trash::Cmd),
+    /// Upload, list, download or delete an object's attached files
+    #[command(subcommand)]
+    Attach(cmd::attach::Command),
 }
 
 fn main() -> ExitCode {
@@ -81,6 +84,7 @@ fn main() -> ExitCode {
         Command::Link(cmd) => cmd::link::run(&ctx, cmd),
         Command::Comment(cmd) => cmd::comment::run(&ctx, cmd),
         Command::Trash(cmd) => cmd::trash::run(&ctx, cmd),
+        Command::Attach(command) => cmd::attach::run(&ctx, command),
     });
     match result {
         Ok(out) if cli.json => println!("{}", out.json),

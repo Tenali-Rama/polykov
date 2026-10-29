@@ -8,6 +8,7 @@ use crate::client::Client;
 use crate::config::{self, CliConfig};
 use crate::error::Error;
 
+pub mod attach;
 pub mod comment;
 pub mod link;
 pub mod login;

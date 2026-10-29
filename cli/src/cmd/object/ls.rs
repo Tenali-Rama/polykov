@@ -76,7 +76,7 @@ fn query(args: &Args) -> String {
 }
 
 /// Percent-encodes everything but unreserved URL characters.
-fn encode(value: &str) -> String {
+pub fn encode(value: &str) -> String {
     value
         .bytes()
         .map(|b| match b {
