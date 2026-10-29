@@ -1,10 +1,10 @@
 # Quality Bar
 
-Builders meet this before pushing a branch for review. Reviewers check every point. A branch merges only when there are no blocking findings.
+Builders meet this before opening a PR. Reviewers check every point. A PR merges only when there are no blocking findings.
 
 ## Definition of done
-1. **Acceptance criteria**: every criterion is met. The reviewer re-checks each one and does not trust the task's Evidence table.
-2. **Verify**: `scripts/factory/clean-verify.sh` passes on the pushed branch, and `ci-status.sh` shows `pass`.
+1. **Acceptance criteria**: every criterion is met. The reviewer re-checks each one and does not trust the PR's evidence table.
+2. **Verify**: `scripts/factory/clean-verify.sh` passes on the pushed branch, and CI is green.
 3. **Tests**:
    - New behaviour is covered, including at least one edge or failure path.
    - Tests would fail without the change.
@@ -30,7 +30,7 @@ Builders meet this before pushing a branch for review. Reviewers check every poi
     - Works at phone width.
     - Touch targets ≥ 44px on Android.
 11. **ML**: there is an experiment log in `docs/models/` that compares against a baseline (spec §5).
-12. **Git**: one task per branch. The owner is the author. No AI attribution.
+12. **Git**: one task per PR. The owner is the author. No AI attribution.
 
 ## Review findings
 - **Blocking**: anything that breaks 1–12. Write each one as specific and actionable: `file:line`, what to change, and why.

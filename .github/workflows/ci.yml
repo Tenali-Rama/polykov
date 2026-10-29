@@ -1,9 +1,12 @@
 name: ci
-# Runs on every pushed work branch and on main. The result is published as a git ref
-# (refs/ci/pass/<sha> or refs/ci/fail/<sha>), which the factory reads with only its deploy key.
 on:
+  pull_request:
   push:
-    branches: [main, 'task/**', 'plan/**', 'chore/**', 'fix/**']
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -42,7 +45,7 @@ jobs:
       - name: No AI attribution in commits
         run: |
           range=HEAD~1..HEAD
-          [ "${GITHUB_REF_NAME}" != main ] && range=origin/main..HEAD
+          [ "${{ github.event_name }}" = pull_request ] && range="origin/${{ github.base_ref }}..HEAD"
           if git log --format=%B "$range" \
               | grep -iqE 'co-authored-by:.*(claude|anthropic)|generated with \[?claude'; then
             echo "::error::Remove AI attribution lines from commit messages"; exit 1
@@ -51,18 +54,3 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  report:
-    needs: [verify, policy]
-    if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Publish result as refs/ci/<result>/<sha>
-        run: |
-          result=fail
-          if [ "${{ needs.verify.result }}" = success ] && [ "${{ needs.policy.result }}" = success ]; then result=pass; fi
-          git push origin "${GITHUB_SHA}:refs/ci/${result}/${GITHUB_SHA}"
-          echo "CI ${result} for ${GITHUB_SHA}"
