@@ -54,6 +54,10 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `links::routes() -> Router<Db>` and `comments::routes() -> Router<Db>`: the link and comment routes below, merged by `app::router`.
 - `links::store::{add(&Db, src, dst) -> Result<(), db::Error>, remove(&Db, src, dst) -> Result<bool, _>, list(&Db, id) -> Result<Links, _>}`: the `links` table. Callers check both ends with `objects::store::summary`. `Links { links, backlinks }` hold `Summary`s of live objects, by title.
 - `comments::store::{create(&Db, object_id, body) -> Result<Comment, db::Error>, list(&Db, object_id) -> Result<Vec<Comment>, _>, update(&Db, id, body) -> Result<Option<Comment>, _>, delete(&Db, id) -> Result<bool, _>}`: the `comments` table; comments on trashed objects are invisible to `update`/`delete`. `body` must already be trimmed and 1 to `comments::MAX_BODY_CHARS` (10000) characters. `Comment` serializes to the comment JSON below.
+- `trash::routes() -> Router<Db>`: the trash routes below, merged by `app::router`.
+- `trash::purge_expired(&Db, now_unix: i64) -> Result<usize, attachments::store::Error>`: deletes for good every object trashed more than `trash::store::RETENTION_SECS` (30 days) before `now_unix`, files first (`attachments::remove_files`), and returns how many. Live objects are never touched.
+- `trash::spawn_purger(Db) -> std::io::Result<()>`: starts a thread that runs `purge_expired` at start-up and then every `trash::PURGE_EVERY` (1 hour); a failed run logs one line. Called by `main.rs`.
+- `trash::store::{list(&Db) -> Result<Vec<Trashed>, db::Error>, restore(&Db, id) -> Result<Option<Object>, _>, purge(&Db, id) -> Result<bool, attachments::store::Error>, empty(&Db) -> Result<usize, _>}`: objects with `deleted_at` set. `Trashed` serializes to the object JSON plus `deleted` and `purge_at`.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
@@ -141,7 +145,7 @@ Body `{"type":"...","title":"...","properties":{...},"pinned":false,"archived":f
 Body with any of `title`, `properties`, `pinned`, `archived`, `tags` (`type` cannot change). `properties` replaces the whole map and `tags` the whole set. Any given field sets `updated` to now; `{}` changes nothing. `200` with the object.
 
 #### `DELETE /api/objects/{id}`
-Moves the object to the trash (sets `deleted_at`); it then gets `404` everywhere. `204`, empty body.
+Moves the object to the trash (sets `deleted_at`); it then gets `404` everywhere except under `/api/trash`. `204`, empty body.
 
 ### Links
 All link routes require auth (`401` as in Authentication). Links go from one object to another (spec §3); backlinks are the links pointing at an object. Both ids must be live objects, else `404 {"error":"object not found"}`; non-integer ids get `400`. Links to or from an object in the trash are hidden, and reappear when it is restored.
@@ -207,6 +211,24 @@ Auth required. `200` with every tag folder in use by a live, non-archived object
 ```json
 {"tags":[{"tag":"work","count":2},{"tag":"work/clienta","count":1}]}
 ```
+
+### Trash
+All trash routes require auth (`401` as in Authentication). Objects deleted with `DELETE /api/objects/{id}` stay in the trash for 30 days, then the server deletes them for good (checked at start-up and every hour). A non-integer `{id}` gets `400`; an id that is unknown or live gets `404 {"error":"not in trash"}`.
+
+#### `GET /api/trash`
+`200 {"objects":[...]}`, newest deleted first. Each is the object JSON plus `deleted` and `purge_at` (`deleted` + 30 days), RFC 3339 UTC:
+```json
+{"id":1,"type":"note","title":"Groceries",...,"deleted":"2026-10-29T09:15:00Z","purge_at":"2026-11-28T09:15:00Z"}
+```
+
+#### `POST /api/trash/{id}/restore`
+Takes the object out of the trash, with its tags, links, comments and attachments. `200` with the object.
+
+#### `DELETE /api/trash/{id}`
+Deletes the object for good: its attachment files, then its row and its tags, links, comments and attachment rows. `204`, empty body.
+
+#### `DELETE /api/trash`
+Deletes every object in the trash for good. `200 {"purged":<n>}`.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 

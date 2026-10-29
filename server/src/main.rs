@@ -40,6 +40,7 @@ async fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     };
     let cfg = config::load(flags, |key| std::env::var(key).ok())?;
     let db = Db::open(&cfg.data_dir)?;
+    polykov_server::trash::spawn_purger(db.clone())?;
     let listener = tokio::net::TcpListener::bind(cfg.bind)
         .await
         .map_err(|e| format!("cannot bind {}: {e}", cfg.bind))?;
