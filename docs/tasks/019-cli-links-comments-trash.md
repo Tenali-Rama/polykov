@@ -2,7 +2,7 @@
 id: 019
 title: Add CLI link, comment and trash command groups
 milestone: M1
-status: todo
+status: done
 deps: [015, 017, 018]
 touches: [cli/src/cmd/link.rs, cli/src/cmd/comment.rs, cli/src/cmd/trash.rs, cli/src/cmd/mod.rs+, cli/src/main.rs+, cli/tests/link.rs, cli/tests/comment.rs, cli/tests/trash.rs, cli/tests/cli.rs+, cli/API.md]
 spec: ["7. Clients & UI", "3. Data Model"]
@@ -26,4 +26,8 @@ Links, backlinks, comments and the trash can be managed from the CLI, with `--js
 - Attachments (020).
 
 ## Notes for next
-<!-- builder fills in -->
+- Each group is a clap `Cmd` enum in `cli/src/cmd/<group>.rs` with one `#[command(subcommand)]` variant in `main.rs`.
+- Reuse: `object::summary` (`<id>  <type>  <title>`, now also used by `line`) and `object::text` were made `pub` in `cli/src/cmd/object/mod.rs` (outside touches, visibility plus a 9-line extraction).
+- `trash ls` prints dates as `YYYY-MM-DD` (date part of `deleted`/`purge_at`); `comment ls` prints the full RFC 3339 `created`.
+- `trash empty` makes `--yes` a required clap flag, so without it clap exits 2 naming `--yes` before any request.
+- Test helpers (`setup`/`ok`) are per test file, as in `tests/object.rs`; moving them to `tests/common` would be a separate chore.

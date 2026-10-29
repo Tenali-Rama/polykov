@@ -60,22 +60,27 @@ fn tags(object: &Value) -> String {
 }
 
 /// A JSON value as text: strings without quotes, everything else as JSON.
-fn text(value: &Value) -> String {
+pub fn text(value: &Value) -> String {
     match value {
         Value::String(s) => s.clone(),
         other => other.to_string(),
     }
 }
 
-/// One `ls` line: `<id>  <type>  <title>  #tag ...`, the id prefixed with `*` if pinned.
-fn line(object: &Value) -> String {
-    let pin = if object["pinned"] == true { "*" } else { "" };
-    let mut line = format!(
-        "{pin}{}  {}  {}",
+/// `<id>  <type>  <title>` of an object or object summary.
+pub fn summary(object: &Value) -> String {
+    format!(
+        "{}  {}  {}",
         object["id"],
         text(&object["type"]),
         text(&object["title"])
-    );
+    )
+}
+
+/// One `ls` line: `<id>  <type>  <title>  #tag ...`, the id prefixed with `*` if pinned.
+fn line(object: &Value) -> String {
+    let pin = if object["pinned"] == true { "*" } else { "" };
+    let mut line = format!("{pin}{}", summary(object));
     let tags = tags(object);
     if !tags.is_empty() {
         line.push_str("  ");

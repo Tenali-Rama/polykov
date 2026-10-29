@@ -8,10 +8,13 @@ use crate::client::Client;
 use crate::config::{self, CliConfig};
 use crate::error::Error;
 
+pub mod comment;
+pub mod link;
 pub mod login;
 pub mod logout;
 pub mod object;
 pub mod status;
+pub mod trash;
 
 /// What a command prints: `human` as text, or `json` (one object) under `--json`.
 pub struct Output {

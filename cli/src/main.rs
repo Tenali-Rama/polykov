@@ -52,6 +52,15 @@ enum Command {
     Archive { id: u64 },
     /// Unarchive an object
     Unarchive { id: u64 },
+    /// Add, remove or list links between objects
+    #[command(subcommand)]
+    Link(cmd::link::Cmd),
+    /// Add, list, edit or delete comments on an object
+    #[command(subcommand)]
+    Comment(cmd::comment::Cmd),
+    /// List, restore or permanently delete trashed objects
+    #[command(subcommand)]
+    Trash(cmd::trash::Cmd),
 }
 
 fn main() -> ExitCode {
@@ -69,6 +78,9 @@ fn main() -> ExitCode {
         Command::Unpin { id } => cmd::object::flag::run(&ctx, id, Flag::Pinned, false),
         Command::Archive { id } => cmd::object::flag::run(&ctx, id, Flag::Archived, true),
         Command::Unarchive { id } => cmd::object::flag::run(&ctx, id, Flag::Archived, false),
+        Command::Link(cmd) => cmd::link::run(&ctx, cmd),
+        Command::Comment(cmd) => cmd::comment::run(&ctx, cmd),
+        Command::Trash(cmd) => cmd::trash::run(&ctx, cmd),
     });
     match result {
         Ok(out) if cli.json => println!("{}", out.json),
