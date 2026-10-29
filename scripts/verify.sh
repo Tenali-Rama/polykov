@@ -39,6 +39,10 @@ if [ -f web/package.json ]; then
   done
 fi
 
+if [ -f Cargo.toml ] && [ -f web/package.json ]; then
+  step smoke scripts/smoke.sh
+fi
+
 if command -v gitleaks >/dev/null; then
   step secrets gitleaks dir --no-banner --redact .
 fi
