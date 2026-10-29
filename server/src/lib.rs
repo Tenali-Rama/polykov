@@ -8,6 +8,7 @@ pub mod config;
 pub mod db;
 pub mod http;
 pub mod links;
+pub mod lists;
 pub mod objects;
 pub mod projects;
 pub mod recur;

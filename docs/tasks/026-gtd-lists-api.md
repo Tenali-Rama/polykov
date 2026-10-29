@@ -2,7 +2,7 @@
 id: 026
 title: Add the Inbox/Today/Upcoming/Someday/Anytime list API and sub-task listing
 milestone: M2
-status: todo
+status: done
 deps: [025]
 touches: [server/src/lists/, server/src/lib.rs+, server/src/app.rs+, server/tests/lists.rs, server/API.md]
 spec: ["Tasks (GTD)", "Capture"]
@@ -35,4 +35,8 @@ Clients can fetch each GTD list and the sub-tasks of a task with one call.
 - Saved views, query language and smart sort (M3). Completed history/logbook (M3).
 
 ## Notes for next
-<!-- builder fills in -->
+- `server/src/lists/` resolves references in one `open_tasks` CTE (trashed project/area/parent read as NULL); add new lists as a `List` variant with a rule + order in `List::sql`.
+- Defaults chosen: `someday` and `all` sort by priority then id; `upcoming` ties break on id; a dated-time `scheduled`/`deadline` compares by its date part.
+- `project=`/`area=` only check the id is a positive integer; an id that is not a live project/area just matches nothing (400 only for malformed ids).
+- Sub-task counts and `/subtasks` count live, non-archived direct children (archived children are hidden like in lists).
+- `lists::{DEFAULT_LIMIT, MAX_LIMIT}` duplicate the object-list values because `objects::list` is private.

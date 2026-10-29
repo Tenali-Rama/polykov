@@ -26,6 +26,7 @@ pub fn router(db: Db, web_dir: &Path) -> Router {
         .merge(crate::trash::routes())
         .merge(crate::tasks::routes())
         .merge(crate::projects::routes())
+        .merge(crate::lists::routes())
         .route("/api", any(not_found))
         .route("/api/", any(not_found))
         .route("/api/{*rest}", any(not_found))
