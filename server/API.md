@@ -19,6 +19,8 @@ Precedence: flag > env var > `<data dir>/config.toml` > default. An empty env va
 ### Database
 `<data dir>/polykov.db`, SQLite (bundled, FTS5 available) in WAL mode with `foreign_keys` on. On open, every migration in `server/migrations/` newer than the recorded version is applied in order, each in its own transaction, and recorded in `schema_version (version, applied_at)`. A database whose recorded version is newer than the binary's latest migration fails start-up with `database schema version N is newer than this binary supports (M); upgrade polykov-server`.
 
+Tables (migration 4, all M1 data; times in Unix seconds; every side table cascades on delete of its object): `objects (id AUTOINCREMENT, type, title, properties JSON text default '{}', pinned, archived, created, updated, deleted_at NULL = live)`, `object_tags (object_id, tag)`, `links (src_id, dst_id, created)` (no self-links), `comments (id, object_id, body, created, updated)`, `attachments (id, object_id, name, mime, size, created)`. See ADR 0007.
+
 Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no gaps) and append it to `MIGRATIONS` in `src/db/migrate.rs`. A test fails if the list and the dir disagree. Never edit a migration that has been merged.
 
 ## Library (`polykov_server`)
@@ -36,6 +38,12 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `auth::Session { token: String, expires_at: Option<String> }` (`None` for an API token): Axum extractor (`FromRequestParts` for any state where `Db: FromRef<S>`) that resolves the caller's session. See Authentication.
 - `auth::tokens::{create(&Db, name) -> Result<(i64, String), auth::Error>, list(&Db) -> Result<Vec<tokens::Info>, _>, delete_by_id(&Db, id) -> Result<bool, _>, authenticate(&Db, token) -> Result<bool, _>}`: the API token store, `api_tokens (id, name, token_hash, created_at, last_used)` (Unix seconds, `last_used` NULL until first use). Tokens are made like session tokens and stored only as `session::hash_token`. `authenticate` records `last_used` on a hit. `Info { id, name, created, last_used: Option<_> }` (RFC 3339 UTC) never holds the token or hash. `tokens::MAX_NAME_CHARS` is 64.
 - `auth::owner::{exists, create, password_hash}` and `auth::password::{hash, verify}`: the single `owner` row and argon2id hashing (PHC strings). `auth::Error` displays a one-line message that never contains a password or token.
+- `http::ApiError` (`IntoResponse`): `ApiError::bad_request(msg)` / `not_found(msg)` (or `Client(status, msg)`) send `4xx {"error":"<msg>"}`; `Internal(cause)` logs one line and sends a bare `500`. `From<db::Error>` gives `Internal`. Feature-module handlers return `Result<_, ApiError>`.
+- `http::blocking(f) -> Result<T, ApiError>`: runs the store call `f: FnOnce() -> Result<T, E>` (`E: Into<ApiError>`) on Tokio's blocking pool; a panic becomes `Internal`.
+- `objects::routes() -> Router<Db>`: the object routes below, merged by `app::router`.
+- `objects::store::{create(&Db, &New) -> Result<Object, db::Error>, get(&Db, id) -> Result<Option<Object>, _>, update(&Db, id, &Changes) -> Result<Option<Object>, _>, trash(&Db, id) -> Result<bool, _>}`: the `objects` table. Reads and writes only see live objects (`deleted_at IS NULL`). `New { type, title, properties, pinned, archived }` and `Changes` (all `Option`, `None` = unchanged) must already be validated with `objects::validate::{object_type, title, properties}`. `Object` serializes to the object JSON below.
+- `objects::store::summary(&Db, id) -> Result<Option<Summary>, db::Error>`: `Summary { id, type, title }` of a live object, `None` if unknown or in the trash. Links, comments and attachments use it to check their target.
+- `objects::validate::{TYPES, MAX_TITLE_CHARS (1000), MAX_PROPERTIES (100), MAX_KEY_CHARS (64)}`: the object input rules below.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
@@ -96,6 +104,30 @@ Auth required. Revokes the token; it then gets `401` everywhere (a token may rev
 - `204`, empty body: revoked.
 - `404 {"error":"token not found"}`: no token with that id. A non-integer id gets axum's standard `400`.
 - `401` as in Authentication.
+
+### Objects
+All object routes require auth (`401` as in Authentication). An object (spec §3) is:
+```json
+{"id":1,"type":"note","title":"Groceries","created":"2026-10-29T09:15:00Z","updated":"2026-10-29T09:15:00Z","archived":false,"pinned":false,"tags":[],"properties":{"aisle":3}}
+```
+Ids are integers that are never reused. `created`/`updated` are RFC 3339 UTC, to the second. `tags` is always `[]` for now (task 014). Rules, each failure a `400 {"error":"..."}`:
+- `type`: one of `task project area goal milestone habit note notebook journal_entry daily_note review event time_entry view forecast_record` (`type must be one of: task, project, ...`).
+- `title`: trimmed, then 1 to 1000 characters (`title must be 1 to 1000 characters`).
+- `properties`: a JSON object (`properties must be an object`; `null` included) of at most 100 keys (`properties must have at most 100 keys`), each 1 to 64 characters (`property names must be 1 to 64 characters`), whose values are a string, number, bool, null or an array of those (`property "<key>" must be a string, number, bool, null or an array of those`).
+
+Unknown body fields, a missing required field, a wrong JSON type or an explicit `null` for `title`/`pinned`/`archived` get axum's standard `422`. A non-integer `{id}` gets `400`. An unknown id, or one in the trash, gets `404 {"error":"object not found"}`.
+
+#### `POST /api/objects`
+Body `{"type":"...","title":"...","properties":{...},"pinned":false,"archived":false}`; `properties` defaults to `{}`, the flags to `false`. `201` with the object.
+
+#### `GET /api/objects/{id}`
+`200` with the object.
+
+#### `PATCH /api/objects/{id}`
+Body with any of `title`, `properties`, `pinned`, `archived` (`type` cannot change). `properties` replaces the whole map. Any given field sets `updated` to now; `{}` changes nothing. `200` with the object.
+
+#### `DELETE /api/objects/{id}`
+Moves the object to the trash (sets `deleted_at`); it then gets `404` everywhere. `204`, empty body.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 

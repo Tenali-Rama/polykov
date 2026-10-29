@@ -1,4 +1,4 @@
-//! Helpers shared by the auth integration tests: a throwaway data dir and one-shot requests
+//! Helpers shared by the integration tests: a throwaway data dir and one-shot requests
 //! against `app::router`.
 #![allow(dead_code)]
 
@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use axum::{
     body::Body,
-    http::{Request, StatusCode, header},
+    http::{Method, Request, StatusCode, header},
 };
 use http_body_util::BodyExt;
 use polykov_server::db::{self, Db};
@@ -93,4 +93,43 @@ pub async fn setup(db: &Db, password: &str) -> Reply {
 
 pub async fn login(db: &Db, password: &str) -> Reply {
     post(db, "/api/login", json!({ "password": password })).await
+}
+
+/// Sets up the owner and logs in; returns the session token.
+pub async fn token(db: &Db) -> String {
+    setup(db, PASSWORD).await;
+    login(db, PASSWORD).await.json()["token"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
+/// Sends `method path`, with `token` as a bearer token and `body` as JSON when given.
+pub async fn call(
+    db: &Db,
+    method: Method,
+    path: &str,
+    token: Option<&str>,
+    body: Option<Value>,
+) -> Reply {
+    let mut req = Request::builder().method(method).uri(path);
+    if let Some(token) = token {
+        req = req.header(header::AUTHORIZATION, format!("Bearer {token}"));
+    }
+    let body = match body {
+        Some(body) => {
+            req = req.header(header::CONTENT_TYPE, "application/json");
+            Body::from(body.to_string())
+        }
+        None => Body::empty(),
+    };
+    send(db, req.body(body).unwrap()).await
+}
+
+/// Creates an object through the API and returns its id.
+pub async fn create_object(db: &Db, token: &str, kind: &str, title: &str) -> i64 {
+    let body = json!({ "type": kind, "title": title });
+    let res = call(db, Method::POST, "/api/objects", Some(token), Some(body)).await;
+    assert_eq!(res.status, StatusCode::CREATED, "{:?}", res.json());
+    res.json()["id"].as_i64().unwrap()
 }
