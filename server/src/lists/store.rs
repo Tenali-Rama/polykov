@@ -1,11 +1,13 @@
 //! The SQL behind the GTD lists: which open tasks each list holds, in what order, and the
 //! sub-task counts. Rows come back through `tasks::store::get_many`.
 
+use chrono::NaiveDate;
 use rusqlite::{Connection, ToSql, params};
 use serde::Serialize;
 
 use crate::{
     db::{self, Db},
+    smartsort,
     tasks::store::{self as tasks, Task},
 };
 
@@ -84,11 +86,19 @@ const OPEN_TASKS: &str = "WITH open_tasks AS (SELECT o.id, o.created, \
 const CHILDREN: &str = "FROM objects o JOIN tasks t ON t.object_id = o.id \
      WHERE t.parent_id = ?1 AND o.type = 'task' AND o.deleted_at IS NULL AND o.archived = 0";
 
+/// The order of a list: each list's own (`Default`) or [`smartsort`] (`Smart`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sort {
+    Default,
+    Smart,
+}
+
 /// A validated list request. `today` is `YYYY-MM-DD`; `project`/`area` filter by those ids.
 #[derive(Debug)]
 pub struct Query {
     pub list: List,
     pub today: String,
+    pub sort: Sort,
     pub project: Option<i64>,
     pub area: Option<i64>,
     pub limit: u32,
@@ -127,6 +137,9 @@ pub fn list(db: &Db, q: &Query) -> Result<Page, db::Error> {
                   JOIN objects a ON a.id = p.area_id AND a.deleted_at IS NULL \
                   WHERE p.area_id = ?3))"
     );
+    if q.sort == Sort::Smart {
+        return smart(db, q, &from);
+    }
     let (ids, total) = {
         let conn = db.conn()?;
         let total = conn
@@ -141,7 +154,27 @@ pub fn list(db: &Db, q: &Query) -> Result<Page, db::Error> {
         (ids(&conn, &sql, args)?, total)
     };
     Ok(Page {
-        tasks: rows(db, &ids)?,
+        tasks: rows(db, tasks::get_many(db, &ids)?)?,
+        total,
+    })
+}
+
+/// The page of `q` in smart order: every match is scored, then the page is cut.
+fn smart(db: &Db, q: &Query, from: &str) -> Result<Page, db::Error> {
+    let sql = format!("{OPEN_TASKS} SELECT id {from} ORDER BY id");
+    let ids = ids(&*db.conn()?, &sql, params![q.today, q.project, q.area])?;
+    let mut all = tasks::get_many(db, &ids)?;
+    // `parse` checked `today`; an unparseable one would leave deadlines unscored.
+    let today = NaiveDate::parse_from_str(&q.today, "%Y-%m-%d").unwrap_or_default();
+    smartsort::sort(&mut all, today);
+    let total = all.len() as i64;
+    let page = all
+        .into_iter()
+        .skip(usize::try_from(q.offset).unwrap_or(usize::MAX))
+        .take(q.limit as usize)
+        .collect();
+    Ok(Page {
+        tasks: rows(db, page)?,
         total,
     })
 }
@@ -150,7 +183,7 @@ pub fn list(db: &Db, q: &Query) -> Result<Page, db::Error> {
 pub fn subtasks(db: &Db, parent: i64) -> Result<Vec<Row>, db::Error> {
     let sql = format!("SELECT o.id {CHILDREN} ORDER BY t.status = 'done', o.id");
     let ids = ids(&*db.conn()?, &sql, params![parent])?;
-    rows(db, &ids)
+    rows(db, tasks::get_many(db, &ids)?)
 }
 
 fn ids(conn: &Connection, sql: &str, args: &[&dyn ToSql]) -> Result<Vec<i64>, db::Error> {
@@ -161,9 +194,8 @@ fn ids(conn: &Connection, sql: &str, args: &[&dyn ToSql]) -> Result<Vec<i64>, db
         .map_err(db::Error::Sqlite)
 }
 
-/// The tasks among `ids`, in order, each with its sub-task counts.
-fn rows(db: &Db, ids: &[i64]) -> Result<Vec<Row>, db::Error> {
-    let tasks = tasks::get_many(db, ids)?;
+/// `tasks`, in order, each with its sub-task counts.
+fn rows(db: &Db, tasks: Vec<Task>) -> Result<Vec<Row>, db::Error> {
     let conn = db.conn()?;
     let sql = format!("SELECT COUNT(*) FILTER (WHERE t.status = 'open'), COUNT(*) {CHILDREN}");
     tasks

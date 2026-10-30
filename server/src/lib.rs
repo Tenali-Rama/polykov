@@ -14,6 +14,7 @@ pub mod projects;
 pub mod query;
 pub mod recur;
 pub mod smartadd;
+pub mod smartsort;
 pub mod tags;
 pub mod tasks;
 pub mod trash;
