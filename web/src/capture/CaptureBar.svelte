@@ -118,10 +118,23 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    if (e.key === 'Tab') return wrapFocus(e);
     if (e.key !== 'Escape') return;
     e.preventDefault();
     e.stopPropagation();
     void close();
+  }
+
+  // Tab cycles within the open bar (input, then each chip's `[ x ]`) instead of reaching the page.
+  function wrapFocus(e: KeyboardEvent) {
+    const dialog = e.currentTarget as HTMLElement;
+    const stops = [...dialog.querySelectorAll<HTMLElement>('input, button')];
+    const first = stops[0];
+    const last = stops[stops.length - 1];
+    const target = e.shiftKey ? (document.activeElement === first ? last : null) : document.activeElement === last ? first : null;
+    if (!target) return;
+    e.preventDefault();
+    target.focus();
   }
 
   // The mirror follows the input's own horizontal scroll, so long lines stay aligned.
@@ -138,9 +151,11 @@
       <span class="sigil" aria-hidden="true">&gt;</span>
       <div class="field">
         <div class="mirror" aria-hidden="true" bind:this={mirror}>
-          {#each shown as seg, i (i)}
-            {#if seg.kind}<span class="tok {seg.kind}" class:unresolved={!seg.resolved}>{seg.text}</span>{:else}{seg.text}{/if}
-          {/each}
+          <span class="line"
+            >{#each shown as seg, i (i)}{#if seg.kind}<span class="tok {seg.kind}" class:unresolved={!seg.resolved}
+                  >{seg.text}</span
+                >{:else}{seg.text}{/if}{/each}</span
+          >
         </div>
         <input
           bind:this={input}
@@ -207,24 +222,26 @@
     flex: 1;
     min-width: 0;
   }
-  .mirror,
+  .line,
   input {
     font: inherit;
     letter-spacing: normal;
     white-space: pre;
   }
+  /* A block, not flex: flex items would drop the whitespace-only runs between tokens. The line
+     box is the input's height, so the text sits where the input's own text does. */
   .mirror {
     position: absolute;
     inset: 0;
-    display: flex;
-    align-items: center;
     overflow: hidden;
+    white-space: nowrap;
+    line-height: 44px;
     pointer-events: none;
   }
   input {
     position: relative;
     width: 100%;
-    min-height: 44px;
+    height: 44px;
     padding: 0;
     border: 0;
     background: transparent;

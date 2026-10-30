@@ -37,6 +37,46 @@ async function capture(page: Page) {
   expect(await upcomingTitles(page)).toContain(title);
 }
 
+/** The mirror's text, its width and its scroll against the input's, after the browser lays both out. */
+const layout = (page: Page) =>
+  page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>('.capture input')!;
+    const mirror = document.querySelector<HTMLElement>('.capture .mirror')!;
+    const line = mirror.querySelector<HTMLElement>('.line')!;
+    const ctx = document.createElement('canvas').getContext('2d')!;
+    ctx.font = getComputedStyle(input).font;
+    return {
+      value: input.value,
+      mirrorText: line.textContent,
+      textWidth: Math.round(ctx.measureText(input.value).width),
+      lineWidth: Math.round(line.getBoundingClientRect().width),
+      inputScroll: [input.scrollWidth, input.scrollLeft],
+      mirrorScroll: [mirror.scrollWidth, mirror.scrollLeft],
+    };
+  });
+
+test('the mirror shows exactly the typed text, at the same width and scroll as the input', async ({ page }) => {
+  await page.goto('/');
+  await expectShell(page);
+  await page.keyboard.press('Control+Space');
+  await page.keyboard.type(`ok ${LINE} `);
+  await expect(chips(page)).toHaveCount(6);
+  let m = await layout(page);
+  expect(m.mirrorText).toBe(m.value);
+  expect(Math.abs(m.lineWidth - m.textWidth)).toBeLessThanOrEqual(1);
+
+  // A line longer than the field: the caret at the end, both scrolled the same.
+  await page.keyboard.type(` ${'more words '.repeat(12)}#end`);
+  await expect(chips(page)).toHaveCount(7);
+  m = await layout(page);
+  expect(m.mirrorText).toBe(m.value);
+  expect(Math.abs(m.lineWidth - m.textWidth)).toBeLessThanOrEqual(1);
+  expect(m.inputScroll[1]).toBeGreaterThan(0);
+  // Within 2 px: Chromium reserves room for the caret at the end of an input.
+  expect(Math.abs(m.mirrorScroll[0] - m.inputScroll[0])).toBeLessThanOrEqual(2);
+  expect(Math.abs(m.mirrorScroll[1] - m.inputScroll[1])).toBeLessThanOrEqual(2);
+});
+
 test('from the object list, Ctrl+Space captures a task into Upcoming', async ({ page }) => {
   await page.goto('/');
   await expectShell(page);

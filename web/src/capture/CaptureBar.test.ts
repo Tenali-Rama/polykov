@@ -194,6 +194,26 @@ describe('capture bar', () => {
     expect(dialog()).toBeInTheDocument();
   });
 
+  it('Tab and Shift+Tab wrap within the open bar', async () => {
+    stub();
+    setup();
+    const input = await openBar();
+    await fireEvent.input(input, { target: { value: 'a p2 p2' } });
+    const chips = await screen.findAllByRole('button', { name: 'unparse p2' });
+    chips[1].focus();
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    chips[1].dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(input).toHaveFocus();
+    await fireEvent.keyDown(input, { key: 'Tab', shiftKey: true });
+    expect(chips[1]).toHaveFocus();
+    // A Tab between stops is left to the browser.
+    chips[0].focus();
+    const inner = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    chips[0].dispatchEvent(inner);
+    expect(inner.defaultPrevented).toBe(false);
+  });
+
   it('shows an unresolved project chip in the error colour', async () => {
     stub({
       parseReply: async () =>
