@@ -157,9 +157,17 @@
     gap: 0.5ch;
     min-height: 44px;
   }
+  /* A native checkbox is 13 px; size the box itself so it is a 44 px touch target. */
+  .filters input[type='checkbox'] {
+    width: 44px;
+    height: 44px;
+    margin: 0;
+  }
   .trashlink {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    min-width: 44px;
     min-height: 44px;
     margin-left: auto;
     color: var(--dim);

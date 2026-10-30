@@ -122,7 +122,6 @@ test.describe('phone fit', () => {
   });
 
   test('object list', async ({ page }) => {
-    test.fixme(true, 'the `pinned only` checkbox is 13×13 px and the `trash` link 38 px wide');
     await api(page.request).create(`fit ${uid()}`, { tags: ['e2e'] });
     await page.goto('/');
     await expect(page.getByRole('list', { name: 'objects' }).getByRole('link').first()).toBeVisible();
@@ -130,12 +129,29 @@ test.describe('phone fit', () => {
   });
 
   test('detail with links, comments and attachments', async ({ page }) => {
-    test.fixme(true, 'the tag `[ x ]` remove button is 38 px wide');
     const { obj, id } = await richObject(page);
     await page.goto(`/#/o/${obj.id}`);
     await expect(page.getByText(`comment ${id}`)).toBeVisible();
     await expect(page.getByText('notes.txt')).toBeVisible();
     await expectPhoneFit(page);
+  });
+
+  test('comment actions', async ({ page }) => {
+    const rest = api(page.request);
+    const obj = await rest.create(`comments ${uid()}`);
+    const comment = await rest.comment(obj.id, 'a comment');
+    await page.goto(`/#/o/${obj.id}`);
+    const comments = page.getByRole('region', { name: 'comments' });
+    const edit = comments.getByRole('button', { name: `edit comment ${comment.id}` });
+    const del = comments.getByRole('button', { name: `delete comment ${comment.id}` });
+    await expect(edit).toBeVisible();
+    const [e, d] = [await edit.boundingBox(), await del.boundingBox()];
+    if (!e || !d) throw new Error('comment actions have no bounding box');
+    expect(Math.abs(e.y - d.y)).toBeLessThanOrEqual(1);
+    for (const box of [e, d]) {
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
   });
 
   test('trash', async ({ page }) => {
