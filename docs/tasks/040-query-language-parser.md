@@ -2,7 +2,7 @@
 id: 040
 title: Add the view query language parser
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [server/src/query/mod.rs, server/src/query/parse.rs, server/src/query/tests.rs, server/src/lib.rs+, server/API.md, docs/decisions/0015-query-language.md]
 spec: ["Organization", "Tasks (GTD)"]
@@ -36,4 +36,8 @@ A pure, DB-free parser turns a filter query such as `type:task priority:<=2 due:
 - SQL compilation and the HTTP endpoint (041). OR between different fields, and parentheses. Front-matter property fields (M4).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `archived:` is not a term: it sets `Query.archived` (default `Archived::No`), so 041 always applies it once.
+- today/tomorrow/yesterday parse to `DateValue::Relative(0|1|-1, Unit::Day)`. Call `DateValue::resolve(today)` in 041; `None` from it on a `Relative` means out of range and should be a 400.
+- `due:none` is `Cmp { op: Eq, value: DateValue::None }` and may sit in a comma list (`due:none,<today`).
+- Tags are already normalized with `tags::normalize`. `subtree` maps onto `tags::store::under`.
+- Text that contains `:` must be quoted, because an unknown field is an error (owner may change).
