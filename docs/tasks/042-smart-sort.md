@@ -2,7 +2,7 @@
 id: 042
 title: Add smart sort and sort=smart on the GTD lists API
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [server/src/smartsort/, server/src/lib.rs+, server/src/lists/mod.rs, server/src/lists/store.rs, server/tests/smartsort.rs, server/API.md, docs/decisions/0017-smart-sort.md]
 spec: ["Tasks (GTD)"]
@@ -31,4 +31,8 @@ Tasks can be ranked by a documented score built from priority, deadline proximit
 - Sort in saved views (043). UI for choosing the sort (045). Goal links (M9). Learned ranking (M12).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `smartsort::sort(&mut [Task], today: NaiveDate)` is the one entry point; 043 views should call it on the full match set, then page (as `lists::store::smart` does).
+- Weights live only in `server/src/smartsort/mod.rs` constants; ADR 0017 states the formula. Changing one means updating both and the unit tests that pin scores.
+- `lists::store::Query` gained `sort: Sort` (`Sort::{Default, Smart}`); any new `Query` literal must set it.
+- Goal relevance is `GOAL_WEIGHT (20) × goal_relevance(&Fields)`, which returns 0 until M9 adds goal links; fill that function in, don't add a new term.
+- Smart order ignores `scheduled`; only priority, deadline and estimate count (spec list).

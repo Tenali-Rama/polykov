@@ -18,7 +18,7 @@ use crate::{
     http::{ApiError, blocking},
     tasks::{self, validate},
 };
-use store::{List, Page};
+use store::{List, Page, Sort};
 
 /// Page size when `limit` is not given.
 pub const DEFAULT_LIMIT: u32 = 100;
@@ -41,6 +41,7 @@ struct Params {
     area: Option<String>,
     limit: Option<String>,
     offset: Option<String>,
+    sort: Option<String>,
 }
 
 fn parse(list: List, p: Params) -> Result<store::Query, ApiError> {
@@ -73,9 +74,15 @@ fn parse(list: List, p: Params) -> Result<store::Query, ApiError> {
             .filter(|&n: &i64| n >= 0)
             .ok_or_else(|| ApiError::bad_request("offset must be a non-negative integer"))?,
     };
+    let sort = match p.sort.as_deref() {
+        None | Some("default") => Sort::Default,
+        Some("smart") => Sort::Smart,
+        Some(_) => return Err(ApiError::bad_request("sort must be default or smart")),
+    };
     Ok(store::Query {
         list,
         today,
+        sort,
         project: id(p.project, "project")?,
         area: id(p.area, "area")?,
         limit,
