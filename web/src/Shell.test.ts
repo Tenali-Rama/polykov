@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import Shell from './Shell.svelte';
 import { makeObj, stubApi } from './objects/testing';
 
 const props = { onlogout: () => {} };
 
-/** `impl` answers everything except the object list body calls, which return empty results. */
+/** `impl` answers everything except the object list body and nav calls, which return empty results. */
 function mockFetch(impl: (path?: string) => Promise<Response>) {
   const fn = vi.fn(async (path?: string) => {
     if (path?.startsWith('/api/objects')) return Response.json({ objects: [], total: 0 });
     if (path === '/api/tags') return Response.json({ tags: [] });
+    if (path === '/api/projects') return Response.json({ projects: [] });
     return impl(path);
   });
   vi.stubGlobal('fetch', fn);
@@ -78,7 +79,21 @@ describe('hash routes', () => {
     'GET /api/tags': () => Response.json({ tags: [] }),
     'GET /api/objects': () => Response.json({ objects: [makeObj(4, { title: 'Listed' })], total: 1 }),
     'GET /api/objects/4': () => Response.json(makeObj(4, { title: 'Opened' })),
+    'GET /api/projects': () => Response.json({ projects: [] }),
+    'GET /api/lists/today': () => Response.json({ tasks: [], total: 0 }),
   };
+
+  it('shows a task list on #/today, checked before the object routes, and the list again on #/', async () => {
+    stubApi(routes);
+    location.hash = '#/today';
+    render(Shell, { props });
+    expect(await screen.findByText('nothing in today')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'lists' })).toBeInTheDocument();
+    location.hash = '#/';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(await screen.findByRole('link', { name: /Listed/ })).toBeInTheDocument();
+    expect(screen.queryByText('nothing in today')).not.toBeInTheDocument();
+  });
 
   it('shows the list on an unknown hash', async () => {
     stubApi(routes);
@@ -120,7 +135,9 @@ describe('hash routes', () => {
     stubApi({ ...routes, 'GET /api/trash': () => Response.json({ objects: [] }) });
     location.hash = '#/';
     render(Shell, { props });
-    expect(await screen.findByRole('link', { name: 'trash' })).toHaveAttribute('href', '#/trash');
+    // The nav has a trash link too.
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'trash' })).toHaveLength(2));
+    for (const a of screen.getAllByRole('link', { name: 'trash' })) expect(a).toHaveAttribute('href', '#/trash');
     location.hash = '#/trash';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     expect(await screen.findByText('trash is empty')).toBeInTheDocument();

@@ -2,7 +2,7 @@
 id: 034
 title: Add web GTD lists, project view with sections, and task rows
 milestone: M2
-status: todo
+status: done
 deps: [026, 027, 028, 033, 037]
 touches: [web/src/tasks/Nav.svelte, web/src/tasks/TaskList.svelte, web/src/tasks/TaskRow.svelte, web/src/tasks/ProjectView.svelte, web/src/tasks/route.ts, web/src/tasks/TaskList.test.ts, web/src/tasks/ProjectView.test.ts, web/src/tasks/route.test.ts, web/src/lib/tasks.ts, web/src/lib/tasks.test.ts, web/src/lib/projects.ts, web/src/lib/projects.test.ts, web/src/Shell.svelte+, web/e2e/lists.spec.ts, web/API.md]
 spec: ["Tasks (GTD)", "7. Clients & UI"]
@@ -42,4 +42,8 @@ In the web UI, the owner can open Inbox, Today, Upcoming, Someday, Anytime, any 
 - Task field editing, checklists and sub-task creation (035). Capture bar (036). Kanban/Eisenhower layouts and smart sort (M3). Drag to reorder (M8 / later).
 
 ## Notes for next
-<!-- builder fills in -->
+- Default: a completed row stays in the list (`[x]`, struck through) until the list reloads, so `x` again reopens it; dispatching `polykov:tasks-changed` (036) is what drops it.
+- Default: nothing is selected until the first `j` (so `j`, `x` acts on the first row); `Enter` on a focused link is left to the browser.
+- The area view lives in `ProjectView` (`kind: 'area'`); `TaskList` shows no `<h1>` when given a `filter`.
+- `TaskList` exports `TASKS_CHANGED` from its module script; 036 can import it instead of repeating the string.
+- `src/tasks/testing.ts` (`makeRow`) was added outside `touches` as a shared test fixture.
