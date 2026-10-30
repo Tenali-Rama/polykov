@@ -66,6 +66,9 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `recur::{Rule { freq: Freq, interval: u32, by_day: Vec<chrono::Weekday>, month_day: Option<u32> }, Freq::{Day, Week, Month, Year}, Rule::parse(&str) -> Result<Rule, String>, next(&Rule, after: NaiveDate) -> NaiveDate, MAX_INTERVAL (365)}`: pure recurrence rules (ADR 0013). `parse` reads `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY[;INTERVAL=1..365][;BYDAY=MO,TU,..][;BYMONTHDAY=1..31]` in any order and case (`BYDAY` only with `WEEKLY`, `BYMONTHDAY` only with `MONTHLY`); the error is a short reason. `Display` gives the canonical form (`FREQ`, then `INTERVAL` if not 1, `BYDAY` Monday first, `BYMONTHDAY`). `next` is the first date strictly after `after`, counting the series from `after`: weeks start on Monday, `WEEKLY` without `BYDAY` keeps `after`'s weekday, `MONTHLY`/`YEARLY` without a month day keep `after`'s day, and a day past the month's end (also Feb 29) clamps to its last day. It saturates at `NaiveDate::MAX`.
 - `tasks::validate::{today() -> chrono::NaiveDate, priority, date, estimate, checklist, MAX_PRIORITY (4), MAX_ESTIMATE_MINUTES (10080), MAX_CHECKLIST_ITEMS (100), MAX_CHECKLIST_TEXT_CHARS (500)}`: the task value rules below; `today()` is the server's UTC date.
 - Dates: the server depends on `chrono` (default features off; `clock`, `std`). Use `chrono::NaiveDate`/`NaiveDateTime` for task dates and `tasks::validate::today()` for "today"; later tasks need no new date dependency.
+- `projects::routes() -> Router<Db>`: the project and section routes below, merged by `app::router`.
+- `projects::store::{get(&Db, id) -> Result<Option<Project>, db::Error>, list(&Db, &Filter) -> Result<Vec<Project>, _>, update(&Db, id, &Changes) -> Result<Option<Project>, ApiError>, STATUSES}`: live `project` objects joined with their `projects` row (defaults when there is none) and their live task counts. `Filter { status: Option<String>, area_id: Option<i64> }` (`None` = any); `list` skips archived projects. `Changes` (also the `PATCH` body; `None` = unchanged, `Some(None)` clears) has `status, area_id, start, deadline`; the store checks every rule (`400`), upserts the row and bumps `updated`. `Project { object: Object, project: Fields }` serializes to the project JSON below.
+- `projects::sections::{list(&Db, project) -> Result<Option<Vec<Section>>, db::Error>, create(&Db, project, title, Option<usize>) -> Result<Option<Section>, _>, update(&Db, id, Option<&str>, Option<usize>) -> Result<Option<Section>, _>, delete(&Db, id) -> Result<bool, _>, title(&str) -> Result<String, ApiError>, position(i64) -> Result<usize, ApiError>, MAX_TITLE_CHARS (200)}`: the `sections` table. `None`/`false` when the project (or the section's project) is not live. Every write renumbers the project's sections `0..n`.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
@@ -275,6 +278,42 @@ A recurring task also gets its `recurrence` set to `null` (so reopening and re-c
 
 #### `POST /api/tasks/{id}/reopen`
 Sets `status` to `open` and clears `completed`. `200` with the task.
+
+### Projects
+All project and section routes require auth (`401` as in Authentication). A project is the object JSON (type `project`) plus its project fields:
+```json
+{"id":2,"type":"project","title":"Launch",...,"project":{"status":"active","area_id":3,"start":"2026-11-01","deadline":null,"open_tasks":4,"done_tasks":1}}
+```
+An object of type `project` made with `POST /api/objects` reads with the defaults (`active`, nulls); edit its title, tags and so on with `PATCH /api/objects/{id}`. `open_tasks`/`done_tasks` count the tasks (not in the trash) whose `project_id` is this project. A non-integer `{id}` gets `400`; an id that is unknown, in the trash or not a project gets `404 {"error":"project not found"}`.
+
+#### `GET /api/projects`
+Query parameters, both optional: `status=active|someday|done|any` (default `active`) and `area=<id>`. `200 {"projects":[...]}`: live, non-archived projects, by title (case-insensitive), then id. A bad value gets `400` (`status must be active, someday, done or any`, `area must be an integer id`); an unknown parameter gets axum's standard `400`.
+
+#### `GET /api/projects/{id}`
+`200` with the project (archived ones included).
+
+#### `PATCH /api/projects/{id}`
+Body with any of `status`, `area_id`, `start`, `deadline`. Each failure is a `400 {"error":"..."}`:
+- `status`: `active`, `someday` or `done` (`status must be active, someday or done`).
+- `area_id`: a live `area` or `null` (`area must be a live area`).
+- `start`, `deadline`: a date or `null`, with the task date rules (`start must be a date YYYY-MM-DD or a local time YYYY-MM-DDTHH:MM`).
+
+Any given field sets `updated` to now; `{}` changes nothing. Unknown fields (including object fields such as `title`), a wrong JSON type or `"status":null` get axum's standard `422`. `200` with the project.
+
+#### Sections
+A section is `{"id":1,"project_id":2,"title":"Plan","position":0}`. A project's positions are always `0..n`. `title` is trimmed, then 1 to 200 characters (`title must be 1 to 200 characters`); `position` is an integer ≥ 0 (`position must be a non-negative integer`), and one past the end means last. Unknown fields get `422`. A non-integer `{sid}` gets `400`; an unknown section, or one whose project is in the trash, gets `404 {"error":"section not found"}`.
+
+#### `GET /api/projects/{id}/sections`
+`200 {"sections":[...]}`, by position.
+
+#### `POST /api/projects/{id}/sections`
+Body `{"title":"...","position":n}`; `position` defaults to last, and an explicit one shifts the later sections down. `201` with the section.
+
+#### `PATCH /api/sections/{sid}`
+Body with `title` and/or `position`: renames and/or moves the section, shifting the ones between. `200` with the section.
+
+#### `DELETE /api/sections/{sid}`
+Deletes the section and closes the gap. Its tasks keep their project and get `section_id: null`. `204`, empty body.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 
