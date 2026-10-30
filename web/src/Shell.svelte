@@ -48,6 +48,14 @@
     }
   }
 
+  /** The skip link: focus the command input. Not a hash change (the hash is the route), and an
+   * Enter stops here so the list keys on `window` don't also open the selected row. */
+  function skipToCommand(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    document.getElementById('command')?.focus();
+  }
+
   onMount(async () => {
     const version = await serverVersion();
     ok = version !== null;
@@ -58,6 +66,9 @@
 <svelte:window {onhashchange} />
 
 <main class="shell">
+  <a class="skip" href="#command" onclick={skipToCommand} onkeydown={(e) => e.key === 'Enter' && skipToCommand(e)}
+    >skip to command line</a
+  >
   <header class="bar">
     <span>polykov</span>
     <span class="status" class:ok={ok === true} class:err={ok === false} role="status">{status}</span>
@@ -223,5 +234,22 @@
     .cursor {
       animation: none;
     }
+  }
+  /* Kept above the viewport (not clipped to 1 px) so it is still a 44 px target; shown on focus. */
+  .skip {
+    position: absolute;
+    top: -100px;
+    left: 0.5rem;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--accent);
+    background: var(--bg);
+    color: var(--accent);
+  }
+  .skip:focus {
+    top: 0.5rem;
   }
 </style>
