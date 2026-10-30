@@ -58,6 +58,27 @@ describe('prompt', () => {
   });
 });
 
+describe('skip link', () => {
+  it('is the first Tab stop, and Enter focuses the command input without changing the route', async () => {
+    stubApi({
+      'GET /health': () => Response.json({ status: 'ok', version: '0.1.0' }),
+      'GET /api/tags': () => Response.json({ tags: [] }),
+      'GET /api/projects': () => Response.json({ projects: [] }),
+      'GET /api/objects': () => Response.json({ objects: [makeObj(4, { title: 'Listed' })], total: 1 }),
+    });
+    location.hash = '#/';
+    render(Shell, { props });
+    // With a row on the list, the list's Enter key (open the selected row) must not fire too.
+    await screen.findByRole('link', { name: /Listed/ });
+    await userEvent.tab();
+    const skip = screen.getByRole('link', { name: 'skip to command line' });
+    expect(skip).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    expect(screen.getByRole('textbox', { name: 'command' })).toHaveFocus();
+    expect(location.hash).toBe('#/');
+  });
+});
+
 describe('logout', () => {
   it('stays in the shell and shows the cause when logout fails', async () => {
     mockFetch(async (path?: string) =>

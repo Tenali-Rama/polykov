@@ -2,7 +2,7 @@
 id: 049
 title: Add a skip link to the command line and uniform 44 px checkboxes
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [web/src/Shell.svelte+, web/src/Shell.test.ts, web/src/app.css, web/src/objects/List.svelte, web/e2e/a11y-fixes.spec.ts, web/API.md]
 spec: ["7. Clients & UI", "8. Customization & Accessibility"]
@@ -25,4 +25,8 @@ M2 review backlog. The bottom command line is reachable from the keyboard in a f
 - Collapsing projects/areas in the nav. Wiring the command line to the palette (044 question).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- Checkbox size lives only in `app.css` (44 × 44 px, `margin: 0`, `flex: none`); new checkboxes need no local CSS. A checkbox wrapped in a `<label>` with text needs the label laid out as a row (flex or inline) to stay tidy.
+- The skip link is an `<a href="#command">` whose click is `preventDefault`ed: the hash is the route, so a real jump would send `#command` to the object list. Its Enter is handled on the link and stops propagation, because the object list's `window` keydown opens the selected row on Enter from any non-control (`ownsKeys` ignores links).
+- It is hidden by sitting above the viewport (`top: -100px`), not by a 1 px clip, so `expectPhoneFit` (which measures every visible link) still sees a 44 px target.
+- e2e runs every file in parallel on one server, and the desktop nav lists every active project, so a test that seeds many real projects pushes other tests' `tabTo` flows (cap 50, e.g. `m1`) over. `a11y-fixes.spec.ts` serves its 30 projects to its own page via `page.route('**/api/projects')` instead.
+- The first Tab stop is now the skip link; unit tests that Tab from the top need one extra press (`App.test.ts` logout).

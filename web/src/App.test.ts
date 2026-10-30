@@ -174,6 +174,8 @@ describe('logout', () => {
     const fetch = server({ ...loggedIn, 'POST /api/logout': () => new Response(null, { status: 204 }) });
     render(App);
     const button = await screen.findByRole('button', { name: 'logout' });
+    // The first Tab stop is the skip link.
+    await userEvent.tab();
     await userEvent.tab();
     expect(button).toHaveFocus();
     await userEvent.keyboard('{Enter}');
