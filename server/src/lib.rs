@@ -11,6 +11,7 @@ pub mod links;
 pub mod lists;
 pub mod objects;
 pub mod projects;
+pub mod query;
 pub mod recur;
 pub mod smartadd;
 pub mod tags;
