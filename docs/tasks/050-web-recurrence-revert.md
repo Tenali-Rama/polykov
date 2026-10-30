@@ -2,7 +2,7 @@
 id: 050
 title: Revert the recurrence editor to the saved rule after a rejected save
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [web/src/tasks/Recurrence.svelte, web/src/tasks/Recurrence.test.ts, web/src/tasks/TaskFields.svelte, web/src/tasks/TaskFields.test.ts, web/e2e/task-detail.spec.ts]
 spec: ["Tasks (GTD)"]
@@ -25,4 +25,7 @@ M2 review backlog. When the server rejects a recurrence change (e.g. interval `0
 - Client-side validation that duplicates the server's rules. Other field editors.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `Recurrence`'s `onsave` now returns `Promise<boolean>`; `TaskFields`' `run`/`patch` resolve `false` on failure (the error still shows inline).
+- The revert resets only the changed control's DOM value (`orRevert`) instead of a `{#key}` re-render, so keyboard focus survives a Tab-triggered save.
+- Weekday toggles need no revert: `aria-pressed` is derived from the saved `value`.
+- `web/API.md` updated for the new `onsave` contract (outside `touches`).
