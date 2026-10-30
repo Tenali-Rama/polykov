@@ -8,6 +8,8 @@ These rules come from repeated review findings, and the COO maintains them throu
 - `touches` must name every file the task edits, hubs included (`lib.rs`, `db/mod.rs`, `db/migrate.rs`, `app.rs`, ADRs). Several M0 tasks had to edit hubs that weren't listed, which made parallel dispatch unsafe.
 - Put a new feature in its own module dir and its own test file. Shared hubs get only append-only registration lines (`touches` entry with a trailing `+`).
 - Verify runs once per round locally (`scripts/verify.sh`), then PR CI is the gate. Don't run `clean-verify.sh` for a PR. It's for a red main.
+- Planners pre-assign ADR numbers: a task that needs an ADR names its number in the task file, and parallel tasks never share one. In M2, four PRs picked the same next free number and needed rebase rounds.
+- Planners and reviewers leave the main checkout on a clean `main` when they finish. Do review and branch work in a worktree. In M2 the shared checkout was left on other branches, which blocked the next dispatch.
 - When several tasks fill a placeholder slot in a shared component, give each filler its own line, so parallel PRs only add lines. In M1, four PRs needed rebase rounds because they all edited the same hub lines.
 
 ## UI tasks
