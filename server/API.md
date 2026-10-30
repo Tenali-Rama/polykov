@@ -23,6 +23,8 @@ Tables (migration 4, all M1 data; times in Unix seconds; every side table cascad
 
 Tables (migration 5, all M2 data; ADR 0011): `tasks (object_id PK, status 'open'|'done', priority 1..4 default 4, scheduled, deadline, estimate minutes, someday, parent_id, project_id, section_id, area_id, checklist JSON default '[]', recurrence JSON NULL, completed)`, `projects (object_id PK, status 'active'|'someday'|'done', area_id, start, deadline)`, `sections (id AUTOINCREMENT, project_id, title, position, created)`. Dates are floating local TEXT (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`). The side rows cascade with their object; references to other objects or sections are `ON DELETE SET NULL`. Indexes: `tasks (parent_id | project_id | area_id | scheduled | deadline)`, `sections (project_id)`.
 
+Tables (migration 6; ADR 0014): `search`, an FTS5 table (trigram tokenizer) with one row per live object, `rowid` = object id, columns `title, tags, props, comments` (tags space-joined, every string value of `properties`, comment bodies space-joined), filled from the view `search_source` and kept in step by triggers on `objects`, `object_tags` and `comments`. Trashed objects have no row; restoring one re-indexes it. Never write to it directly.
+
 Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no gaps) and append it to `MIGRATIONS` in `src/db/migrate.rs`. A test fails if the list and the dir disagree. Never edit a migration that has been merged.
 
 ## Library (`polykov_server`)
@@ -76,6 +78,9 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `smartadd::add(&Db, text: &str, today: NaiveDate) -> Result<Task, ApiError>`: the smart-add capture path every channel shares (Telegram in M10). Blocking: it parses `text` with `polykov_parse::default_parser()` as of `today` (the user's local date) and creates the task with `tasks::store::create`; the `400`s are those of `POST /api/tasks/add`, and on any of them nothing is created.
 - `smartadd::line::{read(&Db, text, today) -> Result<Line, ApiError>, Line { parsed: polykov_parse::Parsed, resolved: Vec<bool>, project_id, area_id: Option<i64> }, MAX_TEXT_CHARS (1000)}`: one parsed line. The parser's `Context` holds the titles of live, non-archived projects and areas; `resolved[i]` is `false` only for a `+project`/`@area` token naming none of them. The parser is built once per thread.
 - `query::{parse(&str) -> Result<Query, ParseError>, Query { terms: Vec<Term>, archived: Archived }, Term { negated, filter: Filter }, ParseError { message, offset }}`: the pure view query parser (ADR 0015). Terms are whitespace-separated and ANDed, `-` negates one, and `"quotes"` keep spaces, `:` and `,` literal. `field:a,b` is OR within the field. A term without an unquoted `:` is `Filter::Text`. The fields are `type`, `tag` (`t` or `t/*` subtree), `status:open|done`, `priority` 1–4, the dates `due|scheduled|created|updated|completed`, `project`/`area` (id or `"title"`), `pinned:true|false`, and `archived:true|false|any`, which sets `Query.archived` (default `No`) instead of adding a term. `priority` and the dates take `=` (implicit), `<`, `<=`, `>`, `>=` per item, and the other fields take no operator. A date is `today|tomorrow|yesterday|YYYY-MM-DD|[+-]N(d|w|m)|none`. Relative dates stay `DateValue::Relative(n, Unit)` until `DateValue::resolve(today) -> Option<NaiveDate>`. `ParseError.offset` is a char index into the input.
+- `search::routes() -> Router<Db>`: `GET /api/search`, merged by `app::router`.
+- `search::matching_ids(&rusqlite::Connection, text: &str) -> Result<Vec<i64>, db::Error>` (also `search::store::matching_ids`): the ids of every live object (archived and completed included) that matches `text` under the rules of `GET /api/search` (short-only `text` matches title word starts only), best first; empty when `text` has no letters or digits. For filtering by text inside another query (views, the palette), e.g. `... AND id IN (SELECT value FROM json_each(?))` bound to the ids as a JSON array. Call it with the connection you already hold (`Db::conn`).
+- `search::store::{search(&Db, &Query) -> Result<Page, db::Error>, Query { text, type: Option<String>, limit: u32, offset: usize }, Page { hits: Vec<Hit>, total: usize }, Hit { id, score: f64, snippet }}`: one page of ranked hits; `Query` must already be validated. `search::fuzzy::{words, find, word_start, snippet, fold}`: the word splitting, per-text matching and snippet rules (ADR 0014). `search::{MAX_QUERY_CHARS (200), DEFAULT_LIMIT (20), MAX_LIMIT (100)}`.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
@@ -358,6 +363,18 @@ Parses `text` and creates the task from the result (title, tags and the `task` f
 - `unknown project: <name>` / `unknown area: <name>` for the first unresolved `+project`/`@area`.
 - `title must be 1 to 1000 characters` when nothing is left of the title after parsing.
 - the tag and task rules, as for `POST /api/tasks`.
+
+### `GET /api/search?q=<text>&type=<type>&limit=1..100&offset=n`
+Requires auth (`401` as in Authentication). Full-text, fuzzy search over every live object, archived and completed included (trashed ones never match). `200`:
+```json
+{"results":[{"object":{"id":1,"type":"note","title":"Meeting notes",...},"snippet":"[Meet]ing notes","score":12.0}],"total":1}
+```
+- `q` is trimmed, then must be 1 to 200 characters (`400 {"error":"q must be 1 to 200 characters"}`). Its words are its runs of letters and digits, case-insensitive; anything else (FTS syntax included) only separates words, so a `q` with no words returns no results. An object matches when every word is found in its title, tags, string property values or comment bodies: as a substring (`ocer` finds `Groceries`), or, for a word of 6+ characters that occurs exactly in no object (of that `type`, if given), with one typo (`groceris`).
+- A `q` with no word of 3+ characters (`a`, `me`, `re me`) matches titles only, each word at the start of a title word (`me` finds `Team meeting`, not `Some time`, nor an object tagged `me`).
+- `score` sums, per word, its best match: column weight (title 4, tags 2, properties 1, comments 1) times quality (whole word 4, word prefix 3, substring 2, typo 1). Results are best first, then newest id first; `total` counts every match.
+- `object` is the object JSON, or for a task / project the task / project JSON (with `task.status` / `project.status`).
+- `snippet` is the text of the column with the strongest match, on one line, with every matched word in `[` `]`, cut to about 80 characters (`…` marks a cut).
+- `type=<type>` limits to one object type (bad type: `400` as for objects). `limit` 1 to 100 (default 20; else `400 {"error":"limit must be 1 to 100"}`), `offset` ≥ 0 (default 0; else `400 {"error":"offset must be a non-negative integer"}`). An unknown parameter gets axum's standard `400`.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 
