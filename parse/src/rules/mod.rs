@@ -58,7 +58,7 @@ impl Parser for RulesParser {
                 words: &words[i..i + len],
             };
             let Some((n, hit)) = find(&run, ctx) else {
-                i += 1;
+                i += recur::malformed(&run).unwrap_or(1);
                 continue;
             };
             hits.push((words[i].start, words[i + n - 1].end, hit));

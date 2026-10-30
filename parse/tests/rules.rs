@@ -107,6 +107,47 @@ fn recurrence_without_a_date_schedules_its_first_occurrence() {
 }
 
 #[test]
+fn yesterday_is_the_day_before_today() {
+    let p = parse("call bob yesterday");
+    assert_eq!(
+        (p.title.as_str(), p.scheduled.as_deref()),
+        ("call bob", Some("2026-10-29"))
+    );
+    assert_eq!(kinds(&p), [(Kind::Date, "yesterday")]);
+}
+
+#[test]
+fn every_n_weeks_on_weekdays() {
+    let p = parse("standup every 2 weeks on tuesday 9am");
+    assert_eq!(p.title, "standup");
+    assert_eq!(
+        p.recurrence.unwrap().rule,
+        "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU"
+    );
+    assert_eq!(p.scheduled.as_deref(), Some("2026-11-03T09:00"));
+    let p = parse("gym every week on mon, thu");
+    assert_eq!(p.recurrence.unwrap().rule, "FREQ=WEEKLY;BYDAY=MO,TH");
+    assert_eq!(
+        (p.title.as_str(), p.scheduled.as_deref()),
+        ("gym", Some("2026-11-02"))
+    );
+    let p = parse("payroll every other week on fri");
+    assert_eq!(
+        p.recurrence.unwrap().rule,
+        "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR"
+    );
+    assert_eq!(p.scheduled.as_deref(), Some("2026-10-30"), "today counts");
+}
+
+#[test]
+fn zero_weeks_on_a_weekday_stays_title_text() {
+    let p = parse("sync every 0 weeks on tue p2");
+    assert_eq!(p.title, "sync every 0 weeks on tue");
+    assert_eq!(kinds(&p), [(Kind::Priority, "p2")]);
+    assert_eq!((p.recurrence, p.scheduled), (None, None));
+}
+
+#[test]
 fn bang_recurrence_counts_from_completion() {
     let p = parse("haircut every! 6 weeks");
     assert_eq!(p.title, "haircut");

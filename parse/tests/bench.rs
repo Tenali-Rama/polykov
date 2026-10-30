@@ -5,11 +5,12 @@
 #[allow(dead_code)] // shared with the bench example, which uses all of it
 mod score;
 
-use polykov_parse::{RulesParser, default_parser};
+use chrono::NaiveDate;
+use polykov_parse::{Context, RulesParser, default_parser};
 use score::Case;
 
 /// Whole-parse exact match of the winner, in percent, as recorded in the doc.
-const RECORDED_EXACT: f64 = 90.2;
+const RECORDED_EXACT: f64 = 90.7;
 
 fn exact(parser: &dyn polykov_parse::Parser, cases: &[Case]) -> f64 {
     let hits = cases
@@ -29,6 +30,27 @@ fn default_parser_keeps_its_recorded_score() {
     assert!(
         got >= RECORDED_EXACT - 1.0,
         "exact match {got:.1}% fell below the recorded {RECORDED_EXACT}% minus 1 point"
+    );
+}
+
+#[test]
+fn default_parser_reads_yesterday_and_every_n_weeks_on() {
+    let ctx = Context {
+        today: NaiveDate::from_ymd_opt(2026, 10, 30).unwrap(),
+        projects: vec![],
+        areas: vec![],
+    };
+    let p = default_parser().parse("call bob yesterday", &ctx);
+    assert_eq!(
+        (p.title.as_str(), p.scheduled.as_deref()),
+        ("call bob", Some("2026-10-29"))
+    );
+    let p = default_parser().parse("standup every 2 weeks on tuesday 9am", &ctx);
+    assert_eq!(p.title, "standup");
+    assert_eq!(p.scheduled.as_deref(), Some("2026-11-03T09:00"));
+    assert_eq!(
+        p.recurrence.map(|r| r.rule).as_deref(),
+        Some("FREQ=WEEKLY;INTERVAL=2;BYDAY=TU")
     );
 }
 

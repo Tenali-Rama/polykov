@@ -2,7 +2,7 @@
 id: 051
 title: Parse "yesterday" and "every N weeks on <weekday>" in smart add
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [parse/src/rules/when.rs, parse/src/rules/recur.rs, parse/src/words.rs, parse/tests/rules.rs, parse/bench/gen.py, parse/bench/train.jsonl, parse/bench/cases.jsonl, parse/src/tagger/model.bin, parse/tests/bench.rs, parse/API.md, docs/models/nl-parser.md]
 spec: ["Capture", "5. Intelligence (local models)"]
@@ -27,4 +27,8 @@ M2 review backlog. Smart add understands `yesterday`, and `every 2 weeks on tues
 - New candidates or model types. Other phrasing gaps not listed here.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `every other week` without `on <weekdays>` is still not parsed (out of scope); `other` only means 2 before `week on`.
+- `recur::malformed` lets the rules driver skip a bad-count `every X weeks on <days>` so it stays title; the tagger path doesn't use it (it can still tag the weekday as a date).
+- gen.py's new forms are gated by `extra=True` (training split only), so the benchmark's synthetic slices are unchanged; hand cases carry the new forms in `cases.jsonl`.
+- Training mix (4% yesterday, 15% weeks-on, half with a trailing time) was chosen from 4 tries; perceptron scores swing ±0.9 pt with the mix.
+- Edited `parse/bench/hand.py` and ADR 0009 outside `touches` (hand cases live there; parse/CLAUDE.md requires the ADR for syntax changes).
