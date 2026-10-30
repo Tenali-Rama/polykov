@@ -2,7 +2,7 @@
 id: 052
 title: Make CLI integration tests stable under load with longer login and startup timeouts
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [cli/src/client.rs, cli/tests/common/mod.rs, cli/API.md]
 spec: ["10. Non-Functional"]
@@ -21,4 +21,6 @@ M2 review backlog. CLI integration tests failed three times under load: `login` 
 - Changing the server's password hashing cost. Retrying failed requests in the CLI itself.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- The CLI never sends `/api/setup`, so `PASSWORD_PATHS` in `cli/src/client.rs` holds only `/api/login`. A new command that makes the server hash a password (e.g. a password change) adds its path there.
+- The per-request timeout is set in `Client::post` only; GET/PUT/PATCH/DELETE never hash a password and keep the agent's 10 s.
+- `tests/common::Server::start` now polls `/health` (up to 30 s) before `/api/setup` (60 s timeout); panics start with `test server start:` or `test server setup:`.

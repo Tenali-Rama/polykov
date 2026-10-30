@@ -38,7 +38,7 @@ Global flags (accepted before or after the subcommand):
 
 ### Errors
 Any failure prints one line on stderr and exits 1: `polykov: <message>`, or `{"error":"<message>"}` with `--json`. Stdout stays empty. Messages:
-- `cannot reach server at <url>: <cause>`: connection refused, DNS, TLS, or the 10 s timeout.
+- `cannot reach server at <url>: <cause>`: connection refused, DNS, TLS, or a timeout (`REQUEST_TIMEOUT`, 10 s; `PASSWORD_TIMEOUT`, 60 s, for `login`).
 - `session missing or expired; run polykov login`: the server answered `401` to an authenticated call.
 - `server returned <status>[: <error field>]`: any other unexpected status.
 
@@ -51,7 +51,7 @@ token = "<64 hex chars>"
 Created with mode `0600`; an existing file keeps the mode its owner set. The token is sent only to the server it was issued by: with another `--server`/`POLYKOV_SERVER`, commands run unauthenticated.
 
 ## Code (binary crate, `src/`)
-- `client::Client::new(server, token: Option<&str>)`: blocking HTTP client (`ureq`, 10 s timeout) that sends `Authorization: Bearer <token>` when given one.
+- `client::Client::new(server, token: Option<&str>)`: blocking HTTP client (`ureq`) that sends `Authorization: Bearer <token>` when given one. Requests time out after `REQUEST_TIMEOUT` (10 s), except a `post` to a path in `PASSWORD_PATHS` (`/api/login`, where the server hashes a password), which gets `PASSWORD_TIMEOUT` (60 s).
   - `get(path)` / `delete(path)` / `post(path, body: Option<&Value>)` / `put(path, body: Option<&Value>)` / `patch(path, body: &Value)` → `Result<Reply, Error>`. `path` includes any query string, already percent-encoded. Every HTTP status is a `Reply { status, body }` (`body` is `Null` if not JSON); only transport failures are `Error::Unreachable`.
   - `Reply::ok()` → the body of a `2xx`, `Error::Unauthorized` on `401`, else `Error::Server`.
   - `post_bytes(path, content_type, bytes: &[u8])` → `Result<Reply, Error>`: a raw body upload with a JSON reply. `get_bytes(path)` → `Result<BytesReply { status, headers, bytes }, Error>` (bodies up to 26 MiB); `BytesReply::ok()` keeps a `2xx` and maps other statuses like `Reply::ok`.
