@@ -64,6 +64,28 @@ enum Command {
     /// Upload, list, download or delete an object's attached files
     #[command(subcommand)]
     Attach(cmd::attach::Command),
+    /// Smart-add a task, e.g. polykov add call mom tmrw 5pm p2
+    Add {
+        #[arg(required = true)]
+        text: Vec<String>,
+    },
+    /// List tasks scheduled or due today, overdue included
+    Today(cmd::task::list::Args),
+    /// List tasks with no project, area or date
+    Inbox(cmd::task::list::Args),
+    /// List tasks scheduled or due after today, grouped by date
+    Upcoming(cmd::task::list::Args),
+    /// List someday tasks
+    Someday(cmd::task::list::Args),
+    /// List tasks that can be done any time
+    Anytime(cmd::task::list::Args),
+    /// Complete tasks (a recurring task gets its next occurrence)
+    Done {
+        #[arg(required = true)]
+        ids: Vec<u64>,
+    },
+    /// Reopen a completed task
+    Reopen { id: u64 },
 }
 
 fn main() -> ExitCode {
@@ -85,6 +107,14 @@ fn main() -> ExitCode {
         Command::Comment(cmd) => cmd::comment::run(&ctx, cmd),
         Command::Trash(cmd) => cmd::trash::run(&ctx, cmd),
         Command::Attach(command) => cmd::attach::run(&ctx, command),
+        Command::Add { text } => cmd::task::add::run(&ctx, text),
+        Command::Today(args) => cmd::task::list::run(&ctx, "today", args),
+        Command::Inbox(args) => cmd::task::list::run(&ctx, "inbox", args),
+        Command::Upcoming(args) => cmd::task::list::run(&ctx, "upcoming", args),
+        Command::Someday(args) => cmd::task::list::run(&ctx, "someday", args),
+        Command::Anytime(args) => cmd::task::list::run(&ctx, "anytime", args),
+        Command::Done { ids } => cmd::task::done::run(&ctx, ids),
+        Command::Reopen { id } => cmd::task::done::reopen(&ctx, id),
     });
     match result {
         Ok(out) if cli.json => println!("{}", out.json),

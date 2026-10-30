@@ -60,6 +60,11 @@ jq -e '.token == "valid"' "$tmp/status.json" >/dev/null || fail "polykov status 
 "$CLI" ls --tag smoke --json >"$tmp/ls.json" 2>&1 || fail "polykov ls failed: $(tail -n 1 "$tmp/ls.json")"
 jq -e '.total == 1' "$tmp/ls.json" >/dev/null || fail "polykov ls --tag smoke: expected total 1: $(cat "$tmp/ls.json")"
 
+"$CLI" add "smoke task tomorrow p1" >"$tmp/add.out" 2>&1 || fail "polykov add failed: $(tail -n 1 "$tmp/add.out")"
+"$CLI" upcoming --json >"$tmp/upcoming.json" 2>&1 || fail "polykov upcoming failed: $(tail -n 1 "$tmp/upcoming.json")"
+jq -e 'any(.tasks[]; .title == "smoke task" and .task.priority == 1)' "$tmp/upcoming.json" >/dev/null \
+  || fail "polykov upcoming --json: smoke task missing: $(cat "$tmp/upcoming.json")"
+
 session=$(sed -n 's/^token = "\(.*\)"$/\1/p' "$tmp/config/polykov/cli.toml" 2>/dev/null)
 [ -n "$session" ] || fail "no token in CLI config after login"
 

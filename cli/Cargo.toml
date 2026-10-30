@@ -10,6 +10,7 @@ name = "polykov"
 path = "src/main.rs"
 
 [dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4", features = ["derive"] }
 rpassword = "7"
 serde = { version = "1", features = ["derive"] }
