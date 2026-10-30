@@ -71,6 +71,9 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `projects::routes() -> Router<Db>`: the project and section routes below, merged by `app::router`.
 - `projects::store::{get(&Db, id) -> Result<Option<Project>, db::Error>, list(&Db, &Filter) -> Result<Vec<Project>, _>, update(&Db, id, &Changes) -> Result<Option<Project>, ApiError>, STATUSES}`: live `project` objects joined with their `projects` row (defaults when there is none) and their live task counts. `Filter { status: Option<String>, area_id: Option<i64> }` (`None` = any); `list` skips archived projects. `Changes` (also the `PATCH` body; `None` = unchanged, `Some(None)` clears) has `status, area_id, start, deadline`; the store checks every rule (`400`), upserts the row and bumps `updated`. `Project { object: Object, project: Fields }` serializes to the project JSON below.
 - `projects::sections::{list(&Db, project) -> Result<Option<Vec<Section>>, db::Error>, create(&Db, project, title, Option<usize>) -> Result<Option<Section>, _>, update(&Db, id, Option<&str>, Option<usize>) -> Result<Option<Section>, _>, delete(&Db, id) -> Result<bool, _>, title(&str) -> Result<String, ApiError>, position(i64) -> Result<usize, ApiError>, MAX_TITLE_CHARS (200)}`: the `sections` table. `None`/`false` when the project (or the section's project) is not live. Every write renumbers the project's sections `0..n`.
+- `smartadd::routes() -> Router<Db>`: `POST /api/parse` and `POST /api/tasks/add`, merged by `app::router`.
+- `smartadd::add(&Db, text: &str, today: NaiveDate) -> Result<Task, ApiError>`: the smart-add capture path every channel shares (Telegram in M10). Blocking: it parses `text` with `polykov_parse::default_parser()` as of `today` (the user's local date) and creates the task with `tasks::store::create`; the `400`s are those of `POST /api/tasks/add`, and on any of them nothing is created.
+- `smartadd::line::{read(&Db, text, today) -> Result<Line, ApiError>, Line { parsed: polykov_parse::Parsed, resolved: Vec<bool>, project_id, area_id: Option<i64> }, MAX_TEXT_CHARS (1000)}`: one parsed line. The parser's `Context` holds the titles of live, non-archived projects and areas; `resolved[i]` is `false` only for a `+project`/`@area` token naming none of them. The parser is built once per thread.
 - `config::load(Flags, env: impl Fn(&str) -> Option<String>) -> Result<Config, config::Error>`: prepares the data dir and merges all sources. `Config { data_dir, bind, web_dir }`; `Flags` holds the same fields as `Option`s. `config::Error` displays a one-line message.
 
 ## HTTP
@@ -333,6 +336,24 @@ GTD lists (spec "Tasks (GTD)", "Capture"). Both routes require auth (`401` as in
 
 #### `GET /api/tasks/{id}/subtasks`
 `200 {"tasks":[...]}`: the live, non-archived direct children of the task, open first, then done, each by `id`. A non-integer `{id}` gets `400`; an id that is unknown, in the trash or not a task gets `404 {"error":"task not found"}`.
+
+### Smart add
+Both routes require auth (`401` as in Authentication) and take the body `{"text":"...","today":"YYYY-MM-DD"}`. `today` is the client's local date (default: the server's UTC date; a bad one is `400 {"error":"today must be a date YYYY-MM-DD"}`). `text` is at most 1000 characters (`400 {"error":"text must be at most 1000 characters"}`). Unknown fields get `422`. The syntax is `polykov-parse`'s (`parse/API.md`); `+project`/`@area` match live, non-archived projects and areas by title, ignoring case, with `-`/`_` read as spaces.
+
+#### `POST /api/parse`
+Parses without writing, for the live preview. `200`:
+```json
+{"title":"call mom","tokens":[{"start":9,"end":13,"kind":"date","text":"tmrw","resolved":true},...],"tags":["family"],"task":{"scheduled":"2026-10-31T17:00","deadline":null,"estimate":30,"priority":2,"recurrence":{"rule":"FREQ=WEEKLY;BYDAY=SU","from":"scheduled"},"project_id":null,"area_id":null}}
+```
+- `tokens` are in input order. `start`/`end` are UTF-16 code-unit offsets into `text` (JavaScript string indices); `kind` is `date time duration priority project area tag deadline recurrence`.
+- `resolved` is `false` for a `+project`/`@area` naming no live project or area, else `true`.
+- `task` fields are `null` when the line doesn't give them (`priority` too).
+
+#### `POST /api/tasks/add`
+Parses `text` and creates the task from the result (title, tags and the `task` fields above). `201` with the task. A line with no project, area or date lands in the Inbox. Each failure is a `400 {"error":"..."}` and creates nothing:
+- `unknown project: <name>` / `unknown area: <name>` for the first unresolved `+project`/`@area`.
+- `title must be 1 to 1000 characters` when nothing is left of the title after parsing.
+- the tag and task rules, as for `POST /api/tasks`.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 

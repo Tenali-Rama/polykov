@@ -12,6 +12,7 @@ pub mod lists;
 pub mod objects;
 pub mod projects;
 pub mod recur;
+pub mod smartadd;
 pub mod tags;
 pub mod tasks;
 pub mod trash;
