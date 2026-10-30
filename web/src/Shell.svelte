@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { logout, serverVersion } from './lib/api';
+  import CaptureBar from './capture/CaptureBar.svelte';
   import Detail from './objects/Detail.svelte';
   import List from './objects/List.svelte';
   import Trash from './objects/Trash.svelte';
@@ -64,6 +65,7 @@
   </header>
   {#if logoutError}<p class="err" role="alert">{logoutError}</p>{/if}
   <Nav />
+  <CaptureBar />
 
   <section class="body">
     {#if taskRoute?.view === 'list'}

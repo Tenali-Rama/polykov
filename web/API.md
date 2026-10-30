@@ -28,6 +28,8 @@
 | `src/auth/Login.svelte` | Login screen: `password`; 401 → `wrong password`. Props: `ondone`, optional `note`. |
 | `src/auth/AuthPanel.svelte` | Box frame for auth screens: title, optional note, field slot, error lines, `[ action ]` submit button (Enter submits). |
 | `src/auth/PasswordPrompt.svelte` | Prompt-style password input (`> label ▌`). Props: `id`, `label`, bindable `value`, `autocomplete`, `autofocus`, `invalid`. |
+| `src/capture/CaptureBar.svelte` | Global capture bar, rendered once by `Shell` (no props). `Ctrl+Space` (a capture-phase `window` listener, so it works while another input has focus) opens a fixed top `dialog` named `capture` with a `> ` prompt input (`capture`). Each input runs `parse` (aborting the previous one; only the latest response applies). A mirror layer behind the transparent input colours each token by kind (`--accent` dates/times/deadlines/recurrences, `--ok` the rest, `--err` an unresolved `+project`/`@area`) when the parse matches the current text. Below, the `parsed` list shows one chip per token (`highlight.chips`) with `[ x ]` (`unparse <token text>`), which wraps that token in quotes and refocuses the input. Enter saves through `add`: the bar closes, focus returns to the element focused before, the note `added to inbox: <title>` or `added: <title> · <list>` (`landing`) shows for 4 s above the body, and `polykov:tasks-changed` is dispatched on `window`. An error (e.g. 400 `unknown project: x`) shows inline and keeps the text; an empty line does nothing; Esc closes without saving (with `preventDefault` + `stopPropagation`) and restores focus. |
+| `src/capture/highlight.ts` | Pure helpers: `segments(text, tokens)` → `Segment { text, kind \| null, resolved }[]` by UTF-16 spans (overlapping or out-of-range spans skipped; segments join back to `text`); `quote(text, token)`; `chips(parsed, today)` → `{ token, label }[]` (`tomorrow`, `17:00`, `1h30m`, `p2`, `#family`, `due <day>`, else the lowercased token text; a repeated field shows its text); `dayLabel(day, today)`; `minutes(n)`. |
 | `src/app.css` | Global tokens: `--bg --fg --dim --line --accent --ok --err`, font stack, `:focus-visible`. |
 | `src/lib/api.ts` | API client helper (below). |
 
@@ -36,8 +38,8 @@
 - `class ApiError extends Error { status: number }` — HTTP status of the failed call.
 - `type Health = { status: string; version: string }` — body of `GET /health`.
 - `type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'`.
-- `send(method, path, body?): Promise<Response>` — same-origin request with `Accept: application/json`. A `Blob`/`File` body is sent raw with its own `Content-Type` (none if the blob has no type); any other defined body is sent as JSON; `undefined` sends no body. On non-2xx throws `ApiError` whose message is the server's `{"error": "..."}` text, else `<path>: HTTP <status>`.
-- `post(path, body?)` — `send('POST', path, body)`.
+- `send(method, path, body?, signal?): Promise<Response>` — same-origin request (`signal`: an `AbortSignal` that cancels it) with `Accept: application/json`. A `Blob`/`File` body is sent raw with its own `Content-Type` (none if the blob has no type); any other defined body is sent as JSON; `undefined` sends no body. On non-2xx throws `ApiError` whose message is the server's `{"error": "..."}` text, else `<path>: HTTP <status>`.
+- `post(path, body?, signal?)` — `send('POST', path, body, signal)`.
 - `type AuthState = 'setup' | 'login' | 'shell'`.
 - `authState(): Promise<AuthState>` — `GET /api/setup` (`needed` → `setup`), then `GET /api/me` (2xx → `shell`, 401 → `login`); other failures throw.
 - `setupOwner(password): Promise<void>` — `POST /api/setup`; throws `ApiError` (400, 409).
@@ -105,6 +107,14 @@ All built on `send`; failures throw `ApiError`.
 - `listProjects({status?, area?}?): Promise<Project[]>` — `GET /api/projects` (server default `active`), unwrapped.
 - `getProject(id)` (404 `project not found`), `updateProject(id, changes)` (`PATCH`) → `Project`.
 - `listSections(project): Promise<Section[]>` (by position); `createSection(project, title, position?)` (last by default); `updateSection(sid, {title?, position?})`; `deleteSection(sid)` (its tasks become unsectioned).
+## `src/lib/smartadd.ts`
+Built on `post`; both send `{ text, today: localToday() }`. Failures throw `ApiError`.
+- `type Token = { start, end, kind: TokenKind, text, resolved }` (UTF-16 offsets); `TokenKind` is `date time duration priority project area tag deadline recurrence`.
+- `type Parsed = { title, tokens, tags, task: ParsedTask }`; `ParsedTask` = `scheduled, deadline, estimate, priority, recurrence, project_id, area_id` (each `null` when not given).
+- `localToday(now = new Date()): string` — local `YYYY-MM-DD`.
+- `parse(text, signal?): Promise<Parsed>` — `POST /api/parse`; `signal` aborts it.
+- `add(text): Promise<AddedTask>` — `POST /api/tasks/add` (400 e.g. `unknown project: x`); `AddedTask` = `Obj` plus the `task` fields the web reads.
+- `landing(task, today)` → `'inbox' | 'today' | 'upcoming' | 'anytime'`: the server's default GTD list the new task lands in.
 
 ## `e2e/` (Playwright; run by `scripts/e2e.sh`)
 - `playwright.config.ts` — projects `phone` (360×740, mobile, touch) and `desktop` (1280×800), Chromium; `BASE_URL` from the env; every test starts logged in from the storage state that `e2e/global-setup.ts` saves (`STATE`). Opt out with `test.use({ storageState: { cookies: [], origins: [] } })`.

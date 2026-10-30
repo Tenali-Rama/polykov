@@ -33,10 +33,12 @@ export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 /**
  * Same-origin request. A `Blob`/`File` body is sent raw with its own type, any other body as JSON
  * (no body when `undefined`). Throws `ApiError` with the server's `error` text on non-2xx.
+ * `signal` cancels the request (the promise then rejects with an `AbortError`).
  */
-export async function send(method: Method, path: string, body?: unknown): Promise<Response> {
+export async function send(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   const init: RequestInit = { method, headers };
+  if (signal) init.signal = signal;
   if (body instanceof Blob) {
     if (body.type !== '') headers['Content-Type'] = body.type;
     init.body = body;
@@ -50,8 +52,8 @@ export async function send(method: Method, path: string, body?: unknown): Promis
 }
 
 /** `send('POST', ...)`. */
-export function post(path: string, body?: unknown): Promise<Response> {
-  return send('POST', path, body);
+export function post(path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
+  return send('POST', path, body, signal);
 }
 
 async function errorText(res: Response, path: string): Promise<string> {
