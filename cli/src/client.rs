@@ -9,7 +9,13 @@ use ureq::{Agent, RequestBuilder};
 
 use crate::error::Error;
 
-const TIMEOUT: Duration = Duration::from_secs(10);
+/// The timeout of every request except those in `PASSWORD_PATHS`.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// The timeout of a request that makes the server hash a password, which is slow on a busy
+/// host.
+const PASSWORD_TIMEOUT: Duration = Duration::from_secs(60);
+/// The paths whose requests make the server hash a password.
+const PASSWORD_PATHS: &[&str] = &["/api/login"];
 /// The largest body read back: above the server's 25 MiB attachment limit.
 const MAX_BODY_BYTES: u64 = 26 * 1024 * 1024;
 
@@ -38,7 +44,7 @@ impl Client {
     pub fn new(server: &str, token: Option<&str>) -> Self {
         let agent = Agent::config_builder()
             .http_status_as_error(false)
-            .timeout_global(Some(TIMEOUT))
+            .timeout_global(Some(REQUEST_TIMEOUT))
             .build()
             .new_agent();
         Client {
@@ -58,7 +64,9 @@ impl Client {
 
     /// POSTs `body` as JSON, or an empty body if `None`.
     pub fn post(&self, path: &str, body: Option<&Value>) -> Result<Reply, Error> {
-        self.send(self.agent.post(self.url(path)), body)
+        let req = self.agent.post(self.url(path));
+        let req = req.config().timeout_global(Some(timeout(path))).build();
+        self.send(req, body)
     }
 
     /// PUTs `body` as JSON, or an empty body if `None`.
@@ -132,6 +140,16 @@ impl Client {
             .map_err(|e| self.unreachable(e))?;
         let body = serde_json::from_str(&text).unwrap_or(Value::Null);
         Ok(Reply { status, body })
+    }
+}
+
+/// The timeout for a request to `path`, which may carry a query string.
+fn timeout(path: &str) -> Duration {
+    let path = path.split_once('?').map_or(path, |(path, _)| path);
+    if PASSWORD_PATHS.contains(&path) {
+        PASSWORD_TIMEOUT
+    } else {
+        REQUEST_TIMEOUT
     }
 }
 
@@ -245,5 +263,16 @@ mod tests {
         let (line, body) = server.join().unwrap();
         assert_eq!(line, "PUT /api/objects/1/links/1 HTTP/1.1");
         assert_eq!(body, "");
+    }
+
+    #[test]
+    fn login_gets_the_password_timeout_and_other_paths_the_default() {
+        assert_eq!(timeout("/api/login"), PASSWORD_TIMEOUT);
+        assert_eq!(timeout("/api/login?x=1"), PASSWORD_TIMEOUT);
+        assert_eq!(timeout("/api/logout"), REQUEST_TIMEOUT);
+        assert_eq!(timeout("/api/login/extra"), REQUEST_TIMEOUT);
+        assert_eq!(timeout("/api/objects"), REQUEST_TIMEOUT);
+        assert_eq!(PASSWORD_TIMEOUT, Duration::from_secs(60));
+        assert_eq!(REQUEST_TIMEOUT, Duration::from_secs(10));
     }
 }

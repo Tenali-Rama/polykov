@@ -5,12 +5,17 @@
 use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use assert_cmd::Command;
 use polykov_server::{app, db::Db};
 use serde_json::{Value, json};
 
 pub const PASSWORD: &str = "correct horse battery";
+/// How long `Server::start` waits for the server to answer `/health`.
+const HEALTH_WAIT: Duration = Duration::from_secs(30);
+/// The timeout of the `/api/setup` call, which hashes the password.
+const SETUP_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// A temp dir removed on drop, unique per test.
 pub struct TempDir(PathBuf);
@@ -59,11 +64,44 @@ impl Server {
                 axum::serve(listener, router).await.unwrap();
             });
         });
+        wait_for_health(&url);
         let res = ureq::post(format!("{url}/api/setup"))
+            .config()
+            .timeout_global(Some(SETUP_TIMEOUT))
+            .build()
             .send_json(json!({ "password": PASSWORD }))
-            .unwrap();
-        assert_eq!(res.status(), 201);
+            .unwrap_or_else(|e| panic!("test server setup: POST {url}/api/setup failed: {e}"));
+        assert_eq!(
+            res.status(),
+            201,
+            "test server setup: POST {url}/api/setup returned {}",
+            res.status()
+        );
         Server { url, _data: data }
+    }
+}
+
+/// Retries `GET /health` until it answers `200`, for up to `HEALTH_WAIT`.
+fn wait_for_health(url: &str) {
+    let deadline = Instant::now() + HEALTH_WAIT;
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        let last = match ureq::get(format!("{url}/health"))
+            .config()
+            .timeout_global(Some(left))
+            .build()
+            .call()
+        {
+            Ok(res) if res.status() == 200 => return,
+            Ok(res) => format!("status {}", res.status()),
+            Err(e) => e.to_string(),
+        };
+        if Instant::now() >= deadline {
+            panic!(
+                "test server start: GET {url}/health did not answer within {HEALTH_WAIT:?}: {last}"
+            );
+        }
+        std::thread::sleep(Duration::from_millis(50));
     }
 }
 
