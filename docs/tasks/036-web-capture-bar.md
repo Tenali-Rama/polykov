@@ -2,7 +2,7 @@
 id: 036
 title: Add the web capture bar with Ctrl+Space and live token highlighting
 milestone: M2
-status: todo
+status: done
 deps: [031, 033, 037]
 touches: [web/src/capture/CaptureBar.svelte, web/src/capture/CaptureBar.test.ts, web/src/capture/highlight.ts, web/src/capture/highlight.test.ts, web/src/lib/smartadd.ts, web/src/lib/smartadd.test.ts, web/src/Shell.svelte+, web/e2e/capture.spec.ts, web/API.md]
 spec: ["Capture", "7. Clients & UI"]
@@ -33,4 +33,8 @@ From any screen, `Ctrl+Space` opens a one-line capture bar that highlights parse
 - `>` switching to the command palette (M3). The system-wide hotkey (M13). Voice input (M11).
 
 ## Notes for next
-<!-- builder fills in -->
+- `lib/api.ts` (outside `touches`) gained an optional `signal` on `send`/`post`, so `parse` can be aborted while still going through `api.ts`.
+- The note's `<list>` is computed client-side by `smartadd.landing` from the server's default list rules (inbox/today/upcoming/anytime); keep it in sync if those rules become configurable.
+- Chips are one per token (date and time are separate chips: `tomorrow · 17:00`); a repeated field shows its raw text, since the parser keeps the first value.
+- Highlighting applies only when the latest parse is for the current text (no mis-coloured offsets mid-typing); `[ x ]` is ignored while the parse is stale.
+- The bar renders the 4 s note itself, above the Shell body; `>` to switch to the palette (M3) should hook into `CaptureBar`'s `reparse`.
