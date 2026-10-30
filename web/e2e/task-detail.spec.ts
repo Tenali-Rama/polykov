@@ -167,3 +167,22 @@ test('completing a recurring task from the panel shows the next date', async ({ 
   await expect(page.getByRole('link', { name: `next ${day(7)}` })).toBeVisible();
   await expect(page.getByRole('button', { name: '[ reopen ]' })).toBeVisible();
 });
+
+test('keyboard: a rejected interval shows the error and the saved interval again', async ({ page }) => {
+  const t = await task(page, `bad interval ${uid()}`, { recurrence: { rule: 'FREQ=WEEKLY;INTERVAL=2', from: 'scheduled' } });
+  await page.goto(`/#/o/${t.id}`);
+  await expect(page.getByText('every 2 weeks · from scheduled')).toBeVisible();
+  await tabTo(page, 'interval');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('0');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'interval' })).toHaveValue('2');
+  // Focus moved on with Tab and stays there: the revert doesn't re-render the editor.
+  await expect(page.getByRole('combobox', { name: 'repeat from' })).toBeFocused();
+  const r = await page.request.get(`/api/tasks/${t.id}`);
+  expect(((await r.json()) as { task: { recurrence: unknown } }).task.recurrence).toEqual({
+    rule: 'FREQ=WEEKLY;INTERVAL=2',
+    from: 'scheduled',
+  });
+});

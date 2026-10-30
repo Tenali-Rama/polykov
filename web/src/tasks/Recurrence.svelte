@@ -12,25 +12,33 @@
   } from '../lib/tasks';
 
   // The task's recurrence editor. Every control change calls `onsave` once with the new value
-  // (`null` for none); the parent sends it and shows a server error.
-  let { value, onsave }: { value: Recurrence | null; onsave: (r: Recurrence | null) => void } = $props();
+  // (`null` for none); the parent sends it, shows a server error and resolves `false` on failure.
+  // The controls always show `value`, the saved rule: a rejected change is put back.
+  let { value, onsave }: { value: Recurrence | null; onsave: (r: Recurrence | null) => Promise<boolean> } = $props();
 
   const parts = $derived<RuleParts | null>(value ? parseRule(value.rule) : null);
   const from = $derived(value?.from ?? 'scheduled');
 
-  function save(next: Partial<RuleParts>, anchor = from) {
+  function save(next: Partial<RuleParts>, anchor = from): Promise<boolean> {
     const base: RuleParts = parts ?? { freq: 'day', interval: 1, byDay: [], monthDay: null };
-    onsave({ rule: buildRule({ ...base, ...next }), from: anchor });
+    return onsave({ rule: buildRule({ ...base, ...next }), from: anchor });
   }
 
-  function setFreq(f: string) {
-    if (f === '') onsave(null);
-    else save({ freq: f as Freq });
+  function setFreq(f: string): Promise<boolean> {
+    return f === '' ? onsave(null) : save({ freq: f as Freq });
   }
 
   function toggleDay(d: Weekday) {
     const days = parts?.byDay ?? [];
-    save({ byDay: days.includes(d) ? days.filter((x) => x !== d) : [...days, d] });
+    void save({ byDay: days.includes(d) ? days.filter((x) => x !== d) : [...days, d] });
+  }
+
+  /**
+   * Puts `control` back to `saved` (what it showed for the saved rule) when the save fails. A
+   * rejected save leaves `value` unchanged, so Svelte would not reset the edited control itself.
+   */
+  async function orRevert(control: HTMLInputElement | HTMLSelectElement, saved: string, saving: Promise<boolean>) {
+    if (!(await saving)) control.value = saved;
   }
 
   /** A number input's value, or `fallback` when it is empty. */
@@ -42,7 +50,7 @@
 <div class="recurrence">
   <p class="text">{value ? describeRecurrence(value) : 'does not repeat'}</p>
   <div class="row">
-    <select aria-label="repeat" value={parts?.freq ?? ''} onchange={(e) => setFreq(e.currentTarget.value)}>
+    <select aria-label="repeat" value={parts?.freq ?? ''} onchange={(e) => orRevert(e.currentTarget, parts?.freq ?? '', setFreq(e.currentTarget.value))}>
       <option value="">none</option>
       {#each FREQS as f (f)}<option value={f}>{f}</option>{/each}
     </select>
@@ -55,7 +63,7 @@
           max="365"
           aria-label="interval"
           value={parts.interval}
-          onchange={(e) => save({ interval: num(e.currentTarget, 1) ?? 1 })}
+          onchange={(e) => orRevert(e.currentTarget, String(parts.interval), save({ interval: num(e.currentTarget, 1) ?? 1 }))}
         />
       </label>
       {#if parts.freq === 'month'}
@@ -67,11 +75,15 @@
             max="31"
             aria-label="month day"
             value={parts.monthDay ?? ''}
-            onchange={(e) => save({ monthDay: num(e.currentTarget, null) })}
+            onchange={(e) => orRevert(e.currentTarget, String(parts.monthDay ?? ''), save({ monthDay: num(e.currentTarget, null) }))}
           />
         </label>
       {/if}
-      <select aria-label="repeat from" value={from} onchange={(e) => save({}, e.currentTarget.value as Recurrence['from'])}>
+      <select
+        aria-label="repeat from"
+        value={from}
+        onchange={(e) => orRevert(e.currentTarget, from, save({}, e.currentTarget.value as Recurrence['from']))}
+      >
         <option value="scheduled">from scheduled</option>
         <option value="completion">from completion</option>
       </select>

@@ -68,12 +68,15 @@
     if (f.parent_id !== before?.parent_id) parent = f.parent_id === null ? null : await getObject(f.parent_id);
   }
 
-  async function run(field: Field, call: () => Promise<Task>) {
+  /** Runs `call` and shows its task; `false` when it failed and `field` shows the error. */
+  async function run(field: Field, call: () => Promise<Task>): Promise<boolean> {
     errors = { ...errors, [field]: '' };
     try {
       await show(await call());
+      return true;
     } catch (e) {
       errors = { ...errors, [field]: message(e) };
+      return false;
     }
   }
 
