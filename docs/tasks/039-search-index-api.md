@@ -2,7 +2,7 @@
 id: 039
 title: Add the FTS5 search index and the fuzzy global search API
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [server/migrations/0006_search.sql, server/src/db/migrate.rs+, server/src/search/, server/src/lib.rs+, server/src/app.rs+, server/tests/search.rs, server/tests/search_perf.rs, server/API.md, docs/decisions/0014-search-index.md]
 spec: ["Organization", "3. Data Model", "10. Non-Functional"]
@@ -35,4 +35,8 @@ spec: ["Organization", "3. Data Model", "10. Non-Functional"]
 - The view query language (040/041). Web UI (044). CLI search (M15). Note bodies (M4 indexes them through the same triggers or extends them).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- Filter by text with `search::matching_ids(&conn, text)` (ranked ids, archived/done included, trashed never); bind them into your SQL as a JSON array via `json_each`.
+- Matching rules live in `search::fuzzy` (words = letter/digit runs, substring, 1 typo for 6+ char words with no exact match anywhere); the FTS expression in `store::match_expr` must stay a superset of what `fuzzy::find` accepts (ADR 0014).
+- New searchable text (note bodies, M4): add a column to `search` / extend the `search_source` view and its triggers in a new migration; never write `search` from Rust.
+- A query made only of 1–2 char words can't use the trigram index and scans every row.
+- Defaults chosen: `limit` default 20; task/project results carry their task/project JSON so `status` is visible.
