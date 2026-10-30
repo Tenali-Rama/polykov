@@ -2,7 +2,7 @@
 id: 032
 title: Add CLI smart add, GTD list commands, done and reopen
 milestone: M2
-status: todo
+status: done
 deps: [026, 031]
 touches: [cli/src/cmd/task/, cli/src/cmd/mod.rs+, cli/src/main.rs+, cli/Cargo.toml, Cargo.lock, cli/tests/task.rs, cli/tests/cli.rs+, cli/API.md, scripts/smoke.sh]
 spec: ["7. Clients & UI", "Capture", "Tasks (GTD)"]
@@ -31,4 +31,8 @@ The owner can capture with `polykov add "call mom tmrw 5pm p2"`, see `polykov to
 - `polykov j` (M7), the TUI (M15).
 
 ## Notes for next
-<!-- builder fills in -->
+- A list row's `<date>` is `scheduled`, else `deadline` (the date `upcoming` groups by); `!` marks it when before today. A task scheduled later with an overdue deadline shows the scheduled date without `!`.
+- The `add` summary hides priority p4 (the default, so an explicit `p4` is not shown either) and shows `project <id>`/`area <id>` by id, since the task JSON has no names.
+- Recurrence is put into words client-side (`cmd/task/render.rs`); `from: completion` adds `after completion`.
+- `reopen` sends no `today`: the endpoint takes none. `done` stops at the first failing id; earlier ones stay done.
+- Paged lists end with `(n of total shown)`, like `polykov ls`.

@@ -50,6 +50,14 @@ fn help_lists_implemented_subcommands_and_global_flags() {
             "comment",
             "trash",
             "attach",
+            "add",
+            "today",
+            "inbox",
+            "upcoming",
+            "someday",
+            "anytime",
+            "done",
+            "reopen",
             "help"
         ]
     );

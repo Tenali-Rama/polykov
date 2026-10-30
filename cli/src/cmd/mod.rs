@@ -15,6 +15,7 @@ pub mod login;
 pub mod logout;
 pub mod object;
 pub mod status;
+pub mod task;
 pub mod trash;
 
 /// What a command prints: `human` as text, or `json` (one object) under `--json`.
