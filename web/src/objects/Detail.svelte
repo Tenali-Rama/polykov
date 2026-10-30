@@ -8,6 +8,9 @@
   import PropsEditor from './PropsEditor.svelte';
   import TagsEditor from './TagsEditor.svelte';
   import { listHref, ownsKeys } from './route';
+  import Checklist from '../tasks/Checklist.svelte';
+  import Subtasks from '../tasks/Subtasks.svelte';
+  import TaskFields from '../tasks/TaskFields.svelte';
 
   // Shell re-creates this component per id (`{#key}`), so `id` is read once on mount.
   let { id, ondeleted }: { id: number; ondeleted: () => void } = $props();
@@ -137,6 +140,7 @@
 
     <!-- Panels: tasks 023 (links, comments) and 024 (attachments) each add one line here. -->
     <section class="panels" aria-label="panels">
+      {#if o.type === 'task'}<TaskFields {id} /><Checklist {id} /><Subtasks {id} />{/if}
       <Links {id} />
       <Comments {id} />
       <Attachments {id} />

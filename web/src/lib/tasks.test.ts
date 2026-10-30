@@ -1,13 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api';
 import {
+  buildRule,
   completeTask,
   createTask,
+  describeRecurrence,
+  formatEstimate,
   getTask,
+  joinDate,
   listSubtasks,
   listTasks,
   localToday,
+  parseEstimate,
+  parseRule,
   reopenTask,
+  splitDate,
   updateTask,
 } from './tasks';
 
@@ -85,5 +92,69 @@ describe('task calls', () => {
     const fetch = stubFetch(() => Response.json({ id: 4 }));
     await reopenTask(4);
     expect(call(fetch)).toMatchObject({ url: '/api/tasks/4/reopen', method: 'POST' });
+  });
+});
+
+describe('estimate', () => {
+  it('parses minutes, m and h forms', () => {
+    expect(parseEstimate('90')).toBe(90);
+    expect(parseEstimate('90m')).toBe(90);
+    expect(parseEstimate('1h30m')).toBe(90);
+    expect(parseEstimate(' 1H 30M ')).toBe(90);
+    expect(parseEstimate('2h')).toBe(120);
+  });
+
+  it('rejects anything else', () => {
+    for (const bad of ['', 'h', 'm', '1.5h', '30m1h', 'ninety', '-5', '1d']) expect(parseEstimate(bad)).toBeNull();
+  });
+
+  it('formats minutes back', () => {
+    expect([45, 60, 90, 600].map(formatEstimate)).toEqual(['45m', '1h', '1h30m', '10h']);
+  });
+});
+
+describe('task dates', () => {
+  it('splits and joins a date and a time', () => {
+    expect(splitDate('2026-11-03T17:30')).toEqual({ date: '2026-11-03', time: '17:30' });
+    expect(splitDate('2026-11-03')).toEqual({ date: '2026-11-03', time: '' });
+    expect(splitDate(null)).toEqual({ date: '', time: '' });
+    expect(joinDate('2026-11-03', '17:30')).toBe('2026-11-03T17:30');
+    expect(joinDate('2026-11-03', '')).toBe('2026-11-03');
+    expect(joinDate('', '17:30')).toBeNull();
+  });
+});
+
+describe('recurrence rules', () => {
+  it('builds the canonical rule', () => {
+    expect(buildRule({ freq: 'day', interval: 1, byDay: [], monthDay: null })).toBe('FREQ=DAILY');
+    expect(buildRule({ freq: 'week', interval: 2, byDay: ['thu', 'mon'], monthDay: null })).toBe(
+      'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH',
+    );
+    expect(buildRule({ freq: 'month', interval: 1, byDay: [], monthDay: 15 })).toBe('FREQ=MONTHLY;BYMONTHDAY=15');
+  });
+
+  it('drops parts the frequency does not take', () => {
+    expect(buildRule({ freq: 'year', interval: 1, byDay: ['mon'], monthDay: 3 })).toBe('FREQ=YEARLY');
+    expect(buildRule({ freq: 'month', interval: 3, byDay: ['mon'], monthDay: null })).toBe('FREQ=MONTHLY;INTERVAL=3');
+  });
+
+  it('parses a rule in any order and case', () => {
+    expect(parseRule('byday=th,mo;FREQ=WEEKLY;INTERVAL=2')).toEqual({
+      freq: 'week',
+      interval: 2,
+      byDay: ['mon', 'thu'],
+      monthDay: null,
+    });
+    expect(parseRule('FREQ=MONTHLY;BYMONTHDAY=31')).toMatchObject({ freq: 'month', monthDay: 31 });
+  });
+
+  it('describes a rule', () => {
+    expect(describeRecurrence({ rule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH', from: 'completion' })).toBe(
+      'every 2 weeks on mon, thu · from completion',
+    );
+    expect(describeRecurrence({ rule: 'FREQ=DAILY', from: 'scheduled' })).toBe('every day · from scheduled');
+    expect(describeRecurrence({ rule: 'FREQ=MONTHLY;BYMONTHDAY=15', from: 'scheduled' })).toBe(
+      'every month on day 15 · from scheduled',
+    );
   });
 });
