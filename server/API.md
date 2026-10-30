@@ -64,6 +64,8 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `tasks::store::{create(&Db, &New) -> Result<Task, ApiError>, get(&Db, id) -> Result<Option<Task>, db::Error>, get_many(&Db, &[i64]) -> Result<Vec<Task>, db::Error>, update(&Db, id, &Changes) -> Result<Option<Task>, ApiError>, reopen(&Db, id) -> Result<Option<Task>, db::Error>}`: live `task` objects joined with their `tasks` row (defaults when there is none). `get_many` returns the live tasks among the ids in the given order and skips the rest. `New { title, properties, pinned, tags, task: FieldChanges }` and `Changes { object: objects::store::Changes, task: FieldChanges }` need their object fields validated as for objects; the store checks every task rule itself (a broken one is `ApiError` `400`) and writes object and task row in one transaction. `FieldChanges` (also the `"task"` request body; all `Option`, `None` = unchanged, `Some(None)` clears) has `priority, scheduled, deadline, estimate, someday, parent_id, project_id, section_id, area_id, checklist, recurrence` (`Option<Option<recurrence::Recurrence>>`). `Task { object: Object, task: Fields }` serializes to the task JSON below.
 - `tasks::recurrence::{complete(&Db, id, today: NaiveDate) -> Result<Option<(Task, Option<Task>)>, ApiError>, validate(&Recurrence) -> Result<Recurrence, ApiError>, Recurrence { rule: String, from: Anchor }, Anchor::{Scheduled, Completion}}`: marks the task done and, if it recurs, creates its next occurrence in the same transaction (see `complete` below). `validate` returns the rule in canonical form or `400 invalid recurrence: <reason>`.
 - `recur::{Rule { freq: Freq, interval: u32, by_day: Vec<chrono::Weekday>, month_day: Option<u32> }, Freq::{Day, Week, Month, Year}, Rule::parse(&str) -> Result<Rule, String>, next(&Rule, after: NaiveDate) -> NaiveDate, MAX_INTERVAL (365)}`: pure recurrence rules (ADR 0013). `parse` reads `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY[;INTERVAL=1..365][;BYDAY=MO,TU,..][;BYMONTHDAY=1..31]` in any order and case (`BYDAY` only with `WEEKLY`, `BYMONTHDAY` only with `MONTHLY`); the error is a short reason. `Display` gives the canonical form (`FREQ`, then `INTERVAL` if not 1, `BYDAY` Monday first, `BYMONTHDAY`). `next` is the first date strictly after `after`, counting the series from `after`: weeks start on Monday, `WEEKLY` without `BYDAY` keeps `after`'s weekday, `MONTHLY`/`YEARLY` without a month day keep `after`'s day, and a day past the month's end (also Feb 29) clamps to its last day. It saturates at `NaiveDate::MAX`.
+- `lists::routes() -> Router<Db>`: the list routes below, merged by `app::router`.
+- `lists::store::{list(&Db, &Query) -> Result<Page, db::Error>, subtasks(&Db, parent) -> Result<Vec<Row>, _>, List::parse(&str) -> Option<List>}`: the GTD list SQL over `tasks`/`projects`; rows come from `tasks::store::get_many`. `Query { list, today: "YYYY-MM-DD", project, area, limit, offset }` must already be validated. `Row { task: Task, subtasks: Counts { open, total } }` and `Page { tasks: Vec<Row>, total }` serialize to the JSON below. `lists::{DEFAULT_LIMIT (100), MAX_LIMIT (1000)}`.
 - `tasks::validate::{today() -> chrono::NaiveDate, priority, date, estimate, checklist, MAX_PRIORITY (4), MAX_ESTIMATE_MINUTES (10080), MAX_CHECKLIST_ITEMS (100), MAX_CHECKLIST_TEXT_CHARS (500)}`: the task value rules below; `today()` is the server's UTC date.
 - Dates: the server depends on `chrono` (default features off; `clock`, `std`). Use `chrono::NaiveDate`/`NaiveDateTime` for task dates and `tasks::validate::today()` for "today"; later tasks need no new date dependency.
 - `projects::routes() -> Router<Db>`: the project and section routes below, merged by `app::router`.
@@ -314,6 +316,23 @@ Body with `title` and/or `position`: renames and/or moves the section, shifting 
 
 #### `DELETE /api/sections/{sid}`
 Deletes the section and closes the gap. Its tasks keep their project and get `section_id: null`. `204`, empty body.
+
+### Lists
+GTD lists (spec "Tasks (GTD)", "Capture"). Both routes require auth (`401` as in Authentication). A row is the task JSON plus `"subtasks":{"open":n,"total":n}`, counting its live, non-archived direct children.
+
+#### `GET /api/lists/{name}?today=YYYY-MM-DD&project=<id>&area=<id>&limit=1..1000&offset=n`
+`200 {"tasks":[...],"total":n}`: one page (`limit` default 100, `offset` default 0) and the number of matches across all pages. `today` defaults to the server's UTC date; clients send their local date. Only live, non-archived, `open` tasks are listed. A reference (`project_id`, `area_id`, `parent_id`) to a trashed object counts as none. A date-time `scheduled`/`deadline` compares by its date. The lists (defaults; the owner may change them):
+- `inbox`: no project, no area, no parent, no `scheduled`, no `deadline`, not `someday`. Newest first.
+- `today`: `scheduled` ≤ today or `deadline` ≤ today (overdue included), any depth. By `priority`, then `deadline` (nulls last), then `scheduled`, then `id`.
+- `upcoming`: `scheduled` > today, or no `scheduled` and `deadline` > today, any depth. By that date, then `priority`, then `id`.
+- `someday`: `someday`, no `scheduled`, top-level (no live parent). By `priority`, then `id`.
+- `anytime`: not `someday`, not in the inbox, `scheduled` null or ≤ today, top-level. By `priority`, then `id`.
+- `all`: every top-level task; with `project=` it is the project view. By `priority`, then `id`.
+
+`project=<id>` keeps tasks in that project; `area=<id>` keeps tasks in that area or in a project whose area it is. An unknown `name` gets `404 {"error":"unknown list"}`. A bad `today` (`today must be a date YYYY-MM-DD`), `limit` (`limit must be 1 to 1000`), `offset` (`offset must be a non-negative integer`) or id (`project must be a positive integer id`) gets `400`; an unknown query parameter gets axum's standard `400`. A well-formed id that is no live project or area matches nothing.
+
+#### `GET /api/tasks/{id}/subtasks`
+`200 {"tasks":[...]}`: the live, non-archived direct children of the task, open first, then done, each by `id`. A non-integer `{id}` gets `400`; an id that is unknown, in the trash or not a task gets `404 {"error":"task not found"}`.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 
