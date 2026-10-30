@@ -70,8 +70,12 @@ def cased(rng, w):
     return rng.choice([w, w, w, w.title(), w.upper()])
 
 
-def date_phrase(rng, today, loose):
-    """A date phrase and its date. `loose` allows forms outside the baseline syntax."""
+def date_phrase(rng, today, loose, extra=False):
+    """A date phrase and its date. `loose` allows forms outside the baseline syntax; `extra`
+    adds the task 051 forms (training split only, so the benchmark's synthetic cases stay
+    comparable across runs)."""
+    if extra and rng.random() < 0.04:
+        return cased(rng, "yesterday"), today - dt.timedelta(days=1)
     k = rng.randrange(9)
     if k == 0:
         return rng.choice(["today", "tod"]), today
@@ -143,11 +147,33 @@ def duration_phrase(rng, loose):
     return rng.choice([("1.5h", 90), ("2.5h", 150), ("0.5h", 30)])
 
 
-def recur_phrase(rng, today, loose):
+def day_list(rng, days):
+    """Weekday names for `days`: `mon`, `mon and thu`, `mon, thu`, `mon, wed and fri`."""
+    names = [rng.choice([WEEKDAYS[d], WEEKDAYS[d][:3]]) for d in days]
+    if len(names) == 1:
+        return names[0]
+    sep = rng.choice([" and ", ", "])
+    return ", ".join(names[:-1]) + sep + names[-1]
+
+
+def weeks_on(rng, today, every, frm):
+    """`every week|other week|N weeks on <weekday list>` (task 051)."""
+    days = sorted(rng.sample(range(7), rng.choice([1, 1, 2, 3])))
+    n = rng.choice([1, 2, 2, rng.randint(3, 6)])
+    unit = "week" if n == 1 else rng.choice(["other week", f"{n} weeks"]) if n == 2 else f"{n} weeks"
+    rule = "FREQ=WEEKLY" + (f";INTERVAL={n}" if n > 1 else "") + ";BYDAY=" + \
+        ",".join(CODES[d] for d in days)
+    first = min(nxt(today, d) for d in days)
+    return f"{every} {unit} on {day_list(rng, days)}", rule, frm, first
+
+
+def recur_phrase(rng, today, loose, extra=False):
     """A recurrence phrase, its rule, anchor and first occurrence."""
     bang = rng.random() < 0.15
     every = "every!" if bang else "every"
     frm = "completion" if bang else "scheduled"
+    if extra and rng.random() < 0.15:
+        return weeks_on(rng, today, every, frm)
     k = rng.randrange(7)
     if loose and rng.random() < 0.15:
         return "every other week", "FREQ=WEEKLY;INTERVAL=2", "scheduled", today
@@ -185,7 +211,7 @@ def mark(rng, name):
                        name.replace(" ", "-")])
 
 
-def synth(rng, slice_, today, titles, traps):
+def synth(rng, slice_, today, titles, traps, extra):
     """One synthetic case: (input, labels per word, expected)."""
     projects, areas, tags = {
         "standard": STANDARD + (TAGS,), "cold": ([], [], TAGS),
@@ -203,7 +229,7 @@ def synth(rng, slice_, today, titles, traps):
     date = time = first = None
     for f in fields:
         if f == "date":
-            text, date = date_phrase(rng, today, loose)
+            text, date = date_phrase(rng, today, loose, extra)
             parts.append((text, "date"))
         elif f == "time":
             text, time = time_phrase(rng, loose)
@@ -226,7 +252,7 @@ def synth(rng, slice_, today, titles, traps):
                 exp[f] = name
             parts.append((("+" if f == "project" else "@") + mark(rng, name), f))
         elif f == "deadline":
-            text, d = date_phrase(rng, today, False)
+            text, d = date_phrase(rng, today, False, extra)
             t = None
             if rng.random() < 0.3:
                 tt, t = time_phrase(rng, False)
@@ -234,7 +260,7 @@ def synth(rng, slice_, today, titles, traps):
             exp["deadline"] = stamp(d, t)
             parts.append((rng.choice(["due", "by"]) + " " + text, "deadline"))
         else:
-            text, r, frm, first = recur_phrase(rng, today, loose)
+            text, r, frm, first = recur_phrase(rng, today, loose, extra)
             exp["recurrence"] = {"rule": r, "from": frm}
             parts.append((text, "recurrence"))
     day = date or first or (today if time else None)
@@ -243,6 +269,8 @@ def synth(rng, slice_, today, titles, traps):
     order = parts[:]
     rng.shuffle(order)
     order = fix_adjacent(order)
+    if extra and rng.random() < 0.5:
+        order = time_last(order)
     front = [] if not order or rng.random() < 0.75 else [order.pop(0)]
     seq = front + [(title, None)] + order
     exp["tags"] = [text[1:].lower() for text, kind in seq if kind == "tag"]
@@ -265,6 +293,15 @@ def fix_adjacent(order):
     return rest + rec
 
 
+def time_last(order):
+    """Moves a time after a closing recurrence (`every 2 weeks on tue 9am`): a time can't
+    join a weekday list."""
+    times = [p for p in order if p[1] == "time"]
+    if not times or order[-1][1] != "recurrence":
+        return order
+    return [p for p in order if p is not times[0]] + times[:1]
+
+
 def case(input_, today, slice_, projects, areas, exp):
     full = dict(title="", scheduled=None, deadline=None, estimate_min=None, priority=None,
                 recurrence=None, project=None, area=None, tags=[])
@@ -273,7 +310,7 @@ def case(input_, today, slice_, projects, areas, exp):
                 expected=full)
 
 
-def build(seed, counts, titles, traps, skip=()):
+def build(seed, counts, titles, traps, skip=(), extra=False):
     rng = random.Random(seed)
     out = []
     seen = set(skip)
@@ -282,7 +319,7 @@ def build(seed, counts, titles, traps, skip=()):
                            "long": (LONG_PROJECTS, LONG_AREAS)}[slice_]
         while sum(1 for c in out if c[0]["slice"] == slice_) < n:
             today = dt.date(2026, 1, 1) + dt.timedelta(days=rng.randrange(730))
-            text, labels, exp = synth(rng, slice_, today, titles, traps)
+            text, labels, exp = synth(rng, slice_, today, titles, traps, extra)
             if text in seen:
                 continue
             seen.add(text)
@@ -297,7 +334,7 @@ def main():
                   TITLES[0::2], TRAPS[0::2])
     cases += [c for c, _ in bench]
     train = build(31, [("standard", 1500), ("cold", 500), ("long", 500)],
-                  TITLES[1::2], TRAPS[1::2], skip={c["input"] for c in cases})
+                  TITLES[1::2], TRAPS[1::2], skip={c["input"] for c in cases}, extra=True)
     with open(os.path.join(HERE, "cases.jsonl"), "w") as f:
         for c in cases:
             f.write(json.dumps(c, ensure_ascii=False) + "\n")

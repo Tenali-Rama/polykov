@@ -29,6 +29,7 @@ pub(super) fn date(run: &Run, today: NaiveDate) -> Option<(usize, NaiveDate)> {
     let d = match w0.as_str() {
         "today" | "tod" => today,
         "tomorrow" | "tmrw" | "tmr" => today + Days::new(1),
+        "yesterday" => today.checked_sub_days(Days::new(1))?,
         w => match weekday(w) {
             Some(day) => next_on_or_after(today, day),
             None if w.len() == 10 => NaiveDate::parse_from_str(w, "%Y-%m-%d").ok()?,
@@ -204,6 +205,14 @@ mod tests {
         for w in ["tomorrow", "tmrw", "tmr"] {
             assert_eq!(on(w), Some((1, ymd(2026, 10, 31))), "{w}");
         }
+        assert_eq!(on("Yesterday"), Some((1, ymd(2026, 10, 29))));
+        let jan1 = ymd(2027, 1, 1);
+        let (words, _) = split("yesterday");
+        let run = Run {
+            input: "yesterday",
+            words: &words,
+        };
+        assert_eq!(date(&run, jan1), Some((1, ymd(2026, 12, 31))));
     }
 
     #[test]
