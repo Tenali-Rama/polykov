@@ -5,17 +5,25 @@
   import List from './objects/List.svelte';
   import Trash from './objects/Trash.svelte';
   import { listHref, parseHash } from './objects/route';
+  import Nav from './tasks/Nav.svelte';
+  import ProjectView from './tasks/ProjectView.svelte';
+  import { parseTaskHash } from './tasks/route';
+  import TaskList from './tasks/TaskList.svelte';
 
   // `focusCommand`: focus the command input on mount (after a login).
   let { onlogout, focusCommand = false }: { onlogout: () => void; focusCommand?: boolean } = $props();
 
   let route = $state(parseHash(location.hash));
+  // Task routes (`#/today`, `#/p/<id>`, ...) are checked before the object routes.
+  let taskRoute = $state(parseTaskHash(location.hash));
   // One-line note above the list (e.g. after a delete); cleared once the route leaves the list.
   let note = $state('');
 
   function onhashchange() {
     route = parseHash(location.hash);
+    taskRoute = parseTaskHash(location.hash);
     if (route.view !== 'list') note = '';
+    if (taskRoute) note = '';
   }
 
   function deleted() {
@@ -55,8 +63,14 @@
     <button type="button" class="logout" onclick={doLogout}>logout</button>
   </header>
   {#if logoutError}<p class="err" role="alert">{logoutError}</p>{/if}
+  <Nav />
 
   <section class="body">
+    {#if taskRoute?.view === 'list'}
+      <TaskList name={taskRoute.list} />
+    {:else if taskRoute}
+      {#key `${taskRoute.view}/${taskRoute.id}`}<ProjectView id={taskRoute.id} kind={taskRoute.view} />{/key}
+    {:else}
     {#if route.view === 'detail'}
       {#key route.id}<Detail id={route.id} ondeleted={deleted} />{/key}
     {:else if route.view === 'trash'}
@@ -64,6 +78,7 @@
     {:else}
       {#if note}<p class="note" role="status">{note}</p>{/if}
       <List />
+    {/if}
     {/if}
   </section>
 
