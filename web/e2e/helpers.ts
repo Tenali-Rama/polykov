@@ -106,13 +106,14 @@ async function hasName(focused: Locator, name: string | RegExp): Promise<boolean
   }
 }
 
-/** Presses Tab until the focused element's accessible name is (or matches) `name`; fails after 50 presses. */
+/** Presses Tab until the focused element's accessible name is (or matches) `name`; fails after 150
+ * presses (the nav's favourites add a Tab stop per pinned object, and parallel tests pin some). */
 export async function tabTo(page: Page, name: string | RegExp) {
   const focused = page.locator(':focus');
   for (let presses = 0; ; presses++) {
     if (await hasName(focused, name)) return;
-    if (presses === 50) break;
+    if (presses === 150) break;
     await page.keyboard.press('Tab');
   }
-  throw new Error(`tabTo: nothing named ${JSON.stringify(String(name))} got focus after 50 Tab presses`);
+  throw new Error(`tabTo: nothing named ${JSON.stringify(String(name))} got focus after 150 Tab presses`);
 }

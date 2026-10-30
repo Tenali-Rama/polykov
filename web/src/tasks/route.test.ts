@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { makeObj, stubApi } from '../objects/testing';
+import type { Obj } from '../lib/objects';
 import Nav from './Nav.svelte';
 import { areaHref, parseTaskHash, projectHref, taskListHref } from './route';
 
@@ -24,11 +25,16 @@ describe('parseTaskHash', () => {
 });
 
 describe('Nav', () => {
-  function api(fail = false) {
+  function api(fail = false, pinned: Obj[] = []) {
     return stubApi({
       'GET /api/projects': () =>
         fail ? new Response('', { status: 500 }) : Response.json({ projects: [{ ...makeObj(7, { title: 'Launch' }) }] }),
-      'GET /api/objects': () => Response.json({ objects: [makeObj(9, { type: 'area', title: 'Work' })], total: 1 }),
+      'GET /api/objects': (url) =>
+        Response.json(
+          url.includes('pinned=true')
+            ? { objects: pinned, total: pinned.length }
+            : { objects: [makeObj(9, { type: 'area', title: 'Work' })], total: 1 },
+        ),
     });
   }
 
@@ -60,7 +66,11 @@ describe('Nav', () => {
     ]);
     expect(links[1]).toHaveAttribute('aria-current', 'page');
     expect(links.filter((a) => a.hasAttribute('aria-current'))).toHaveLength(1);
-    expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/projects', '/api/objects?type=area&limit=1000']);
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      '/api/objects?pinned=true&limit=100',
+      '/api/projects',
+      '/api/objects?type=area&limit=1000',
+    ]);
 
     location.hash = '#/p/7';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -105,6 +115,16 @@ describe('Nav', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveFocus();
     expect(outer).not.toHaveBeenCalled();
+  });
+
+  it('puts favourites first in the menu, inside the arrow-key order', async () => {
+    api(false, [makeObj(3, { title: 'Ideas', pinned: true })]);
+    render(Nav);
+    const fav = await screen.findByRole('link', { name: 'note Ideas', hidden: true });
+    await fireEvent.click(screen.getByRole('button', { name: 'lists' }));
+    expect(fav).toHaveFocus();
+    await fireEvent.keyDown(fav, { key: 'ArrowDown' });
+    expect(screen.getByRole('link', { name: 'inbox', hidden: true })).toHaveFocus();
   });
 
   it('closes the menu when the route changes', async () => {

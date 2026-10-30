@@ -2,7 +2,7 @@
 id: 048
 title: Add the favourites section to the web sidebar
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [web/src/favourites/Favourites.svelte, web/src/favourites/Favourites.test.ts, web/src/tasks/Nav.svelte+, web/src/objects/Detail.svelte+, web/e2e/favourites.spec.ts, web/API.md]
 spec: ["Organization", "7. Clients & UI"]
@@ -35,4 +35,8 @@ Every pinned object, saved views included, appears under `favourites` in the nav
 - Manual reordering of favourites (sidebar ordering is M16). Collapsing projects/areas in the nav.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `Favourites` exports `OBJECTS_CHANGED` (`polykov:objects-changed`); any later pin/unpin outside `Detail` (e.g. the views list, task 045) should dispatch it so the nav refreshes.
+- The `#/v/<id>` href is built inline in `Favourites.svelte`; once `views/route.ts` (045) exists, swap it for its `viewHref`.
+- Favourites are the first links of the phone menu, so `[ lists ]` now focuses the first favourite when any exist; e2e `lists.spec.ts` arrows down past them.
+- Nav and Shell unit tests route the `pinned=true` objects call separately; new tests that render `Nav` should do the same.
+- Pinned objects add Tab stops to every page, so e2e `tabTo` now gives up after 150 presses, and e2e tests that pin objects trash them when done.

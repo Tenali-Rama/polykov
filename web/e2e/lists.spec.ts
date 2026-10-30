@@ -102,7 +102,12 @@ test.describe('phone fit', () => {
     await page.goto('/#/inbox');
     await tabTo(page, 'lists');
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('link', { name: 'inbox', exact: true })).toBeFocused();
+    // Favourites pinned by parallel tests come first in the menu; arrow down past them.
+    const inbox = page.getByRole('link', { name: 'inbox', exact: true });
+    for (let i = 0; i < 200 && !(await inbox.evaluate((el) => el === document.activeElement)); i++) {
+      await page.keyboard.press('ArrowDown');
+    }
+    await expect(inbox).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('link', { name: 'today', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
