@@ -46,7 +46,7 @@ impl List {
                 "substr(scheduled, 1, 10) > ?1 \
                  OR (scheduled IS NULL AND substr(deadline, 1, 10) > ?1)"
                     .into(),
-                "COALESCE(scheduled, deadline), priority, id",
+                "substr(COALESCE(scheduled, deadline), 1, 10), priority, id",
             ),
             List::Someday => (
                 "someday = 1 AND scheduled IS NULL AND parent IS NULL".into(),
@@ -123,7 +123,9 @@ pub fn list(db: &Db, q: &Query) -> Result<Page, db::Error> {
     let from = format!(
         "FROM open_tasks WHERE ({rule}) AND (?2 IS NULL OR project = ?2) \
          AND (?3 IS NULL OR area = ?3 \
-              OR project IN (SELECT object_id FROM projects WHERE area_id = ?3))"
+              OR project IN (SELECT p.object_id FROM projects p \
+                  JOIN objects a ON a.id = p.area_id AND a.deleted_at IS NULL \
+                  WHERE p.area_id = ?3))"
     );
     let (ids, total) = {
         let conn = db.conn()?;

@@ -116,6 +116,7 @@ async fn today_holds_due_and_overdue_tasks_at_any_depth() {
 
 #[tokio::test]
 async fn upcoming_holds_future_dated_tasks_by_date_then_priority() {
+    // Same-day ties go by priority, whatever the time of day.
     let (_dir, db) = DataDir::new("lists-upcoming");
     let auth = token(&db).await;
     let later = task(&db, &auth, json!({ "scheduled": "2026-11-05" })).await;
@@ -130,7 +131,7 @@ async fn upcoming_holds_future_dated_tasks_by_date_then_priority() {
     let high = task(
         &db,
         &auth,
-        json!({ "scheduled": "2026-11-02", "priority": 1, "parent_id": parent }),
+        json!({ "scheduled": "2026-11-02T09:00", "priority": 1, "parent_id": parent }),
     )
     .await;
     task(
@@ -265,6 +266,10 @@ async fn project_and_area_filters() {
     assert_eq!(area_view, [in_project, in_area]);
     let other_view = ids(&db, &auth, "anytime", &format!("&project={other}")).await;
     assert_eq!(other_view, [elsewhere]);
+    // A trashed area counts as none, also when reached through a project.
+    trash(&db, &auth, area).await;
+    let res = get(&db, &auth, &format!("/api/lists/all?area={area}")).await;
+    assert_eq!(res.json(), json!({ "tasks": [], "total": 0 }));
 }
 
 #[tokio::test]
