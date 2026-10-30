@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 use axum::http::{Method, StatusCode};
 use common::{DataDir, call, token};
+use polykov_server::db::Db;
 use rusqlite::params;
 
 const OBJECTS: usize = 100_000;
@@ -61,7 +62,7 @@ const TAGS: &[&str] = &[
 const TYPES: &[&str] = &["task", "note", "project", "event", "habit"];
 
 /// Queries of every kind the search supports: prefix, substring, one typo, multi-word,
-/// tags, property values and a short word.
+/// tags and property values.
 const QUERIES: &[&str] = &[
     "meet",
     "groc",
@@ -84,6 +85,10 @@ const QUERIES: &[&str] = &[
     "garden%20fence",
     "xyzzyq",
 ];
+
+/// Queries with no word of 3+ characters, i.e. the first keystrokes of a palette search.
+/// They take the title-only path (ADR 0014), so each is checked on its own, not via p95.
+const SHORT_QUERIES: &[&str] = &["a", "e", "m", "me", "to", "re%20me", "zq"];
 
 /// A deterministic pseudo-random sequence (xorshift), so every run seeds the same data.
 struct Rng(u64);
@@ -138,28 +143,42 @@ async fn search_p95_is_under_100ms_on_100k_objects() {
     tx.commit().unwrap();
     println!("seeded {OBJECTS} objects in {:?}", seeding.elapsed());
 
-    let mut times: Vec<Duration> = Vec::new();
+    let mut times = Vec::new();
     for q in QUERIES {
-        let started = Instant::now();
-        let res = call(
-            &db,
-            Method::GET,
-            &format!("/api/search?q={q}"),
-            Some(&auth),
-            None,
-        )
-        .await;
-        let took = started.elapsed();
-        assert_eq!(res.status, StatusCode::OK, "{q}");
-        println!("{q:>24}: {took:>10.2?}, total {}", res.json()["total"]);
-        times.push(took);
+        times.push(timed(&db, &auth, q).await);
     }
     times.sort();
     let at = |p: usize| times[(times.len() * p).div_ceil(100) - 1];
     let (p50, p95) = (at(50), at(95));
-    println!("p50 {p50:.2?}, p95 {p95:.2?}");
+
+    let mut slowest = Duration::ZERO;
+    for q in SHORT_QUERIES {
+        slowest = slowest.max(timed(&db, &auth, q).await);
+    }
+    println!("p50 {p50:.2?}, p95 {p95:.2?}, slowest short query {slowest:.2?}");
     assert!(
         p95 < Duration::from_millis(100),
         "p95 {p95:?} is over budget"
     );
+    assert!(
+        slowest < Duration::from_millis(100),
+        "short query {slowest:?} is over budget"
+    );
+}
+
+/// How long `GET /api/search?q=<q>` took; prints it with the total.
+async fn timed(db: &Db, auth: &str, q: &str) -> Duration {
+    let started = Instant::now();
+    let res = call(
+        db,
+        Method::GET,
+        &format!("/api/search?q={q}"),
+        Some(auth),
+        None,
+    )
+    .await;
+    let took = started.elapsed();
+    assert_eq!(res.status, StatusCode::OK, "{q}");
+    println!("{q:>24}: {took:>10.2?}, total {}", res.json()["total"]);
+    took
 }

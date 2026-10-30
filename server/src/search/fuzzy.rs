@@ -78,6 +78,28 @@ pub fn find(word: &[char], text: &[char], typos: bool) -> Option<Found> {
     best
 }
 
+/// The quality of the best match of `word` at the start of a word of `text` (whole word or
+/// prefix), as [`find`] would rate it, without folding all of `text` first: the per-row
+/// check of queries the index can't narrow, which must stay cheap.
+pub fn word_start(word: &[char], text: &str) -> Option<f64> {
+    let mut best = None;
+    let mut after_word = false;
+    for (i, c) in text.char_indices() {
+        let alphanumeric = c.is_alphanumeric();
+        if alphanumeric && !after_word {
+            let mut rest = text[i..].chars();
+            if word.iter().all(|&w| rest.next().map(fold) == Some(w)) {
+                if !rest.next().is_some_and(char::is_alphanumeric) {
+                    return Some(quality::WORD);
+                }
+                best = Some(quality::PREFIX);
+            }
+        }
+        after_word = alphanumeric;
+    }
+    best
+}
+
 /// Whether a word boundary lies before char `i` of `text` (`i == len` included).
 fn boundary(text: &[char], i: usize) -> bool {
     i == 0 || i == text.len() || !text[i - 1].is_alphanumeric() || !text[i].is_alphanumeric()
@@ -208,6 +230,21 @@ mod tests {
         assert!(found("meeting", "").is_none());
         assert_eq!(found("meetimg", "meeting").unwrap().quality, quality::TYPO);
         assert!(find(&folded("groceris"), &folded("groceries"), false).is_none());
+    }
+
+    #[test]
+    fn word_start_rates_like_find_but_ignores_inner_matches() {
+        let rate = |word: &str, text: &str| word_start(&folded(word), text);
+        assert_eq!(rate("me", "Team Me"), Some(quality::WORD));
+        assert_eq!(rate("me", "Team meeting"), Some(quality::PREFIX));
+        assert_eq!(rate("me", "(Meet)"), Some(quality::PREFIX));
+        assert_eq!(rate("é", "Été"), Some(quality::PREFIX));
+        assert_eq!(rate("me", "Some time"), None);
+        assert_eq!(rate("me", "m"), None);
+        for (word, text) in [("te", "Team meeting"), ("a", "work/a b"), ("ab", "ab")] {
+            let found = find(&folded(word), &folded(text), false).map(|f| f.quality);
+            assert_eq!(rate(word, text), found, "{word} in {text}");
+        }
     }
 
     #[test]

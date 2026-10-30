@@ -38,5 +38,5 @@ spec: ["Organization", "3. Data Model", "10. Non-Functional"]
 - Filter by text with `search::matching_ids(&conn, text)` (ranked ids, archived/done included, trashed never); bind them into your SQL as a JSON array via `json_each`.
 - Matching rules live in `search::fuzzy` (words = letter/digit runs, substring, 1 typo for 6+ char words with no exact match anywhere); the FTS expression in `store::match_expr` must stay a superset of what `fuzzy::find` accepts (ADR 0014).
 - New searchable text (note bodies, M4): add a column to `search` / extend the `search_source` view and its triggers in a new migration; never write `search` from Rust.
-- A query made only of 1–2 char words can't use the trigram index and scans every row.
+- A query made only of 1–2 char words can't use the trigram index: it matches title word starts only (`store::titles`, one pass over `objects.title`), which the palette (044) gets for its first keystrokes.
 - Defaults chosen: `limit` default 20; task/project results carry their task/project JSON so `status` is visible.

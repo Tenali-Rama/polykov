@@ -261,6 +261,34 @@ async fn fts_syntax_and_short_queries_never_fail() {
 }
 
 #[tokio::test]
+async fn short_queries_match_word_starts_in_titles_only() {
+    let (_dir, db) = DataDir::new("search-short");
+    let auth = token(&db).await;
+    let me = create_object(&db, &auth, "note", "Me").await;
+    let meeting = create_object(&db, &auth, "note", "Team meeting").await;
+    let tagged = create_object(&db, &auth, "note", "Other").await;
+    patch(
+        &db,
+        &auth,
+        &format!("/api/objects/{tagged}"),
+        json!({ "tags": ["me"] }),
+    )
+    .await;
+    create_object(&db, &auth, "note", "Some time").await;
+
+    // A whole word outranks a prefix; "time"'s inner "me" and the tag don't count.
+    assert_eq!(ids(&db, &auth, "me").await, vec![me, meeting]);
+    assert_eq!(ids(&db, &auth, "TE%20me").await, vec![meeting]);
+    assert_eq!(ids(&db, &auth, "m").await, vec![meeting, me]);
+    assert_eq!(ids(&db, &auth, "ee").await, Vec::<i64>::new());
+    let body = search(&db, &auth, "q=me").await.json();
+    assert_eq!(body["total"], 2);
+    assert_eq!(body["results"][1]["snippet"], "Team [me]eting");
+    let typed = search(&db, &auth, "q=me&type=task").await.json();
+    assert_eq!(typed["total"], 0);
+}
+
+#[tokio::test]
 async fn bad_parameters_get_400_and_no_auth_gets_401() {
     let (_dir, db) = DataDir::new("search-input");
     let auth = token(&db).await;

@@ -113,23 +113,35 @@ fn rank(conn: &Connection, words: &[Word], kind: Option<&str>) -> rusqlite::Resu
     if words.is_empty() {
         return Ok(Vec::new());
     }
-    let expr = match_expr(words);
-    let mut filters = vec![if expr.is_some() {
-        "search MATCH ?1"
+    let mut ranked = match match_expr(words) {
+        Some(expr) => indexed(conn, words, &expr, kind)?,
+        None => titles(conn, words, kind)?,
+    };
+    ranked.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(Ordering::Equal)
+            .then(b.id.cmp(&a.id))
+    });
+    Ok(ranked)
+}
+
+/// The FTS5 candidates for `expr` (of type `kind`, if given) that match every word in some
+/// column.
+fn indexed(
+    conn: &Connection,
+    words: &[Word],
+    expr: &str,
+    kind: Option<&str>,
+) -> rusqlite::Result<Vec<Scored>> {
+    let filter = if kind.is_some() {
+        "JOIN objects o ON o.id = search.rowid WHERE o.type = ?2 AND"
     } else {
-        "?1 IS NULL"
-    }];
-    let mut join = "";
-    if kind.is_some() {
-        join = "JOIN objects o ON o.id = search.rowid";
-        filters.push("o.type = ?2");
-    } else {
-        filters.push("?2 IS NULL");
-    }
+        "WHERE ?2 IS NULL AND"
+    };
     let mut stmt = conn.prepare(&format!(
-        "SELECT search.rowid, {} FROM search {join} WHERE {}",
+        "SELECT search.rowid, {} FROM search {filter} search MATCH ?1",
         COLUMNS.map(|c| format!("search.{c}")).join(", "),
-        filters.join(" AND ")
     ))?;
     let mut rows = stmt.query(params![expr, kind])?;
     let mut ranked = Vec::new();
@@ -144,12 +156,33 @@ fn rank(conn: &Connection, words: &[Word], kind: Option<&str>) -> rusqlite::Resu
             });
         }
     }
-    ranked.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(Ordering::Equal)
-            .then(b.id.cmp(&a.id))
-    });
+    Ok(ranked)
+}
+
+/// The live objects (of type `kind`, if given) whose title has every word at the start of
+/// one of its words. For queries with no word the index can look up: matching such words
+/// anywhere in every column would score every row and break the budget (ADR 0014).
+fn titles(conn: &Connection, words: &[Word], kind: Option<&str>) -> rusqlite::Result<Vec<Scored>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title FROM objects WHERE deleted_at IS NULL AND (?1 IS NULL OR type = ?1)",
+    )?;
+    let mut rows = stmt.query([kind])?;
+    let mut ranked = Vec::new();
+    'rows: while let Some(row) = rows.next()? {
+        let title = row.get_ref(1)?.as_str()?;
+        let mut score = 0.0;
+        for word in words {
+            match fuzzy::word_start(&word.chars, title) {
+                Some(quality) => score += quality * WEIGHTS[0],
+                None => continue 'rows,
+            }
+        }
+        ranked.push(Scored {
+            id: row.get(0)?,
+            score,
+            column: 0,
+        });
+    }
     Ok(ranked)
 }
 
