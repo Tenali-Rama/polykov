@@ -68,7 +68,9 @@ test('phone: the open bar with all chips fits, and a long line does not scroll t
 test('keyboard only: open from another input, type, unparse a chip, Esc restores focus', async ({ page }) => {
   await page.goto('/');
   await expectShell(page);
-  await tabTo(page, 'command');
+  // Start with focus in another input (the Shell command line); the list above it has many stops.
+  const command = page.getByRole('textbox', { name: 'command' });
+  await command.focus();
   await page.keyboard.press('Control+Space');
   await expect(input(page)).toBeFocused();
   const title = `kbd capture ${uid()}`;
@@ -80,6 +82,6 @@ test('keyboard only: open from another input, type, unparse a chip, Esc restores
   await expect(page.getByRole('button', { name: 'unparse p2' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(bar(page)).toBeHidden();
-  await expect(page.getByRole('textbox', { name: 'command' })).toBeFocused();
+  await expect(command).toBeFocused();
   expect(page.url()).toMatch(/\/(#\/)?$/);
 });
