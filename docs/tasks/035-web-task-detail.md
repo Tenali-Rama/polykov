@@ -2,7 +2,7 @@
 id: 035
 title: Add the web task panel with fields, recurrence, checklist and sub-tasks
 milestone: M2
-status: todo
+status: done
 deps: [034, 037]
 touches: [web/src/tasks/TaskFields.svelte, web/src/tasks/TaskFields.test.ts, web/src/tasks/Recurrence.svelte, web/src/tasks/Checklist.svelte, web/src/tasks/Checklist.test.ts, web/src/tasks/Subtasks.svelte, web/src/tasks/Subtasks.test.ts, web/src/lib/tasks.ts, web/src/lib/tasks.test.ts, web/src/objects/Detail.svelte+, web/e2e/task-detail.spec.ts, web/API.md]
 spec: ["Tasks (GTD)", "7. Clients & UI", "3. Data Model"]
@@ -39,4 +39,8 @@ Opening a task shows every task field editable in place, with its checklist and 
 - Time tracking and actual time (M6). Reminders (M9). Editing task fields via smart-add text.
 
 ## Notes for next
-<!-- builder fills in -->
+- Each panel loads its own copy of the task (`getTask`); `TaskFields`, `Checklist` and `Detail` PATCH disjoint fields, so they never overwrite each other.
+- Recurrence edits the 027 rule subset in canonical form (`buildRule` in `lib/tasks.ts`); a `BYDAY`/`BYMONTHDAY` part is dropped when the frequency doesn't take it.
+- Parent matches reuse `findByTitle` and keep only `type === 'task'` (the server would 400 anything else).
+- A time is only offered once a date is set; clearing the date clears the time too.
+- The "non-task objects show no task panels" Vitest test lives in `TaskFields.test.ts` (it renders `Detail`), since `Detail.test.ts` is not in `touches`.

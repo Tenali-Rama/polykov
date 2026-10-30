@@ -83,3 +83,75 @@ export async function completeTask(id: number): Promise<{ task: Task; next: Task
 export async function reopenTask(id: number): Promise<Task> {
   return (await send('POST', `/api/tasks/${id}/reopen`)).json();
 }
+
+/**
+ * Estimate text to whole minutes: `90`, `90m`, `2h`, `1h30m` (spaces and case ignored).
+ * `null` when the text is none of these; the 1..10080 range is the server's rule.
+ */
+export function parseEstimate(text: string): number | null {
+  const m = /^(?:(\d+)h)?(?:(\d+)m?)?$/.exec(text.replace(/\s+/g, '').toLowerCase());
+  if (!m || (m[1] === undefined && m[2] === undefined)) return null;
+  return Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0);
+}
+
+/** Minutes as `45m`, `2h` or `1h30m`. */
+export function formatEstimate(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h === 0 ? `${m}m` : m === 0 ? `${h}h` : `${h}h${m}m`;
+}
+
+/** A task date (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`) split into its date and its time (`''` if none). */
+export function splitDate(value: string | null): { date: string; time: string } {
+  const [date = '', time = ''] = (value ?? '').split('T');
+  return { date, time };
+}
+
+/** The task date for a date and an optional time; `null` (cleared) without a date. */
+export function joinDate(date: string, time: string): string | null {
+  if (date === '') return null;
+  return time === '' ? date : `${date}T${time}`;
+}
+
+export const FREQS = ['day', 'week', 'month', 'year'] as const;
+export type Freq = (typeof FREQS)[number];
+/** Monday first, as the server's canonical `BYDAY`. */
+export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+/** A recurrence rule (server `recur::Rule`): `byDay` only for `week`, `monthDay` only for `month`. */
+export type RuleParts = { freq: Freq; interval: number; byDay: Weekday[]; monthDay: number | null };
+
+const FREQ_WORDS: Record<Freq, string> = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' };
+const dayCode = (d: Weekday) => d.slice(0, 2).toUpperCase();
+
+/** The rule in the server's canonical form: `FREQ`, then `INTERVAL` if not 1, `BYDAY`, `BYMONTHDAY`. */
+export function buildRule(parts: RuleParts): string {
+  const out = [`FREQ=${FREQ_WORDS[parts.freq]}`];
+  if (parts.interval !== 1) out.push(`INTERVAL=${parts.interval}`);
+  const days = WEEKDAYS.filter((d) => parts.byDay.includes(d));
+  if (parts.freq === 'week' && days.length > 0) out.push(`BYDAY=${days.map(dayCode).join(',')}`);
+  if (parts.freq === 'month' && parts.monthDay !== null) out.push(`BYMONTHDAY=${parts.monthDay}`);
+  return out.join(';');
+}
+
+/** Reads a rule the server served (any key order and case). */
+export function parseRule(rule: string): RuleParts {
+  const parts: RuleParts = { freq: 'day', interval: 1, byDay: [], monthDay: null };
+  for (const pair of rule.toUpperCase().split(';')) {
+    const [key, value = ''] = pair.split('=');
+    if (key === 'FREQ') parts.freq = FREQS.find((f) => FREQ_WORDS[f] === value) ?? 'day';
+    else if (key === 'INTERVAL') parts.interval = Number(value);
+    else if (key === 'BYDAY') parts.byDay = WEEKDAYS.filter((d) => value.split(',').includes(dayCode(d)));
+    else if (key === 'BYMONTHDAY') parts.monthDay = Number(value);
+  }
+  return parts;
+}
+
+/** E.g. `every 2 weeks on mon, thu · from completion`, `every month on day 15 · from scheduled`. */
+export function describeRecurrence(rec: Recurrence): string {
+  const p = parseRule(rec.rule);
+  let text = p.interval === 1 ? `every ${p.freq}` : `every ${p.interval} ${p.freq}s`;
+  if (p.freq === 'week' && p.byDay.length > 0) text += ` on ${p.byDay.join(', ')}`;
+  if (p.freq === 'month' && p.monthDay !== null) text += ` on day ${p.monthDay}`;
+  return `${text} · from ${rec.from}`;
+}
