@@ -2,7 +2,7 @@
 id: 031
 title: Add the smart add API with live parse and add-to-inbox
 milestone: M2
-status: todo
+status: done
 deps: [025, 027, 028, 030]
 touches: [server/src/smartadd/, server/src/lib.rs+, server/src/app.rs+, server/Cargo.toml, Cargo.lock, server/tests/smartadd.rs, server/API.md]
 spec: ["Capture", "5. Intelligence", "Tasks (GTD)"]
@@ -35,4 +35,8 @@ One line of text becomes a fully filled-in task in a single call. A separate par
 - Voice input (M11), Telegram (M10), the auto-tagger (M11).
 
 ## Notes for next
-<!-- builder fills in -->
+- `smartadd::add(&Db, text, today)` is blocking and returns `ApiError`; Telegram (M10) and voice (M11) should call it inside `http::blocking`.
+- `resolved` comes from running `RulesParser` on the token text alone, so it uses the parser's own name folding and isn't a second copy of that rule.
+- The parser is a `thread_local!` (`Box<dyn Parser>` is not `Sync`), so each blocking-pool thread reads the model once.
+- Defaults: `priority` in the parse preview is `null` when not given; `text` over 1000 *characters* is a 400; the unknown-name check runs before the empty-title check.
+- The spec-example and Inbox tests read back through `GET /api/lists/upcoming|inbox` (026), so a list-rule change shows up here too.
