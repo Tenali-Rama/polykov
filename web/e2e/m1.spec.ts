@@ -54,7 +54,8 @@ test.describe('logged out', () => {
     const rows = page.getByRole('list', { name: 'objects' }).getByRole('link');
     await expect(rows.nth(1)).toBeVisible();
     const first = (await rows.nth(0).locator('.title').textContent()) ?? '';
-    await tabTo(page, new RegExp(escape(first)));
+    // Anchored, so a favourite in the nav (`<type> <title>`) never matches; a pinned row starts with `pinned`.
+    await tabTo(page, new RegExp(`^(pinned )?${escape(first)}`));
     await expect(rows.nth(0)).toBeFocused();
     await page.keyboard.press('j');
     await expect(rows.nth(1)).toBeFocused();
@@ -62,7 +63,7 @@ test.describe('logged out', () => {
     await expect(rows.nth(0)).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/#\/o\/\d+$/);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(first);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(new RegExp(`^(\\* )?${escape(first)}$`));
 
     await page.keyboard.press('Escape');
     await expect(page).toHaveURL(/#\/$/);

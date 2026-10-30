@@ -38,6 +38,7 @@
   /** One `PATCH`; the server's object (normalized tags, new `updated`) replaces ours. Throws `ApiError`. */
   async function save(patch: Patch) {
     obj = await updateObject(id, patch);
+    if (patch.pinned !== undefined) window.dispatchEvent(new Event('polykov:objects-changed'));
   }
 
   function editTitle(current: string) {

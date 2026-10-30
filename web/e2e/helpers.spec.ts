@@ -33,6 +33,6 @@ test.describe('helpers', () => {
 
   test('tabTo fails when nothing has the name', async ({ page }) => {
     await page.setContent(VIEWPORT + '<button>one</button>');
-    await expect(tabTo(page, 'missing')).rejects.toThrow('nothing named "missing" got focus after 50 Tab presses');
+    await expect(tabTo(page, 'missing')).rejects.toThrow('nothing named "missing" got focus after 150 Tab presses');
   });
 });

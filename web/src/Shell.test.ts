@@ -98,7 +98,11 @@ describe('hash routes', () => {
   const routes = {
     'GET /health': () => Response.json({ status: 'ok', version: '0.1.0' }),
     'GET /api/tags': () => Response.json({ tags: [] }),
-    'GET /api/objects': () => Response.json({ objects: [makeObj(4, { title: 'Listed' })], total: 1 }),
+    // The nav's favourites (`pinned=true`) stay empty, so `Listed` is only the list row.
+    'GET /api/objects': (url: string) =>
+      Response.json(
+        url.includes('pinned=true') ? { objects: [], total: 0 } : { objects: [makeObj(4, { title: 'Listed' })], total: 1 },
+      ),
     'GET /api/objects/4': () => Response.json(makeObj(4, { title: 'Opened' })),
     'GET /api/projects': () => Response.json({ projects: [] }),
     'GET /api/lists/today': () => Response.json({ tasks: [], total: 0 }),
