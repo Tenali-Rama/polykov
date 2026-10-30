@@ -154,6 +154,7 @@ describe('sections', () => {
     const fetch = await view({
       'DELETE /api/sections/10': () => {
         deleted = true;
+        sections = [section(11, 'Build', 0)];
         return new Response(null, { status: 204 });
       },
     });
@@ -169,6 +170,39 @@ describe('sections', () => {
     await waitFor(() => expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Build']));
     expect(deleted).toBe(true);
     expect(fetch.mock.calls.filter(([url]) => url.startsWith('/api/lists'))).toHaveLength(2);
+  });
+});
+
+describe('section positions after a delete', () => {
+  it('deleting a non-last section reloads positions: the ends disable and a move sends the new position', async () => {
+    const moves: unknown[] = [];
+    const fetch = api({
+      'DELETE /api/sections/10': () => {
+        sections = [section(11, 'Build', 0), section(12, 'Ship', 1)];
+        return new Response(null, { status: 204 });
+      },
+      'PATCH /api/sections/12': (_, init) => {
+        moves.push(body(init));
+        sections = [section(12, 'Ship', 0), section(11, 'Build', 1)];
+        return Response.json(sections[0]);
+      },
+    });
+    sections = [section(10, 'Plan', 0), section(11, 'Build', 1), section(12, 'Ship', 2)];
+    render(ProjectView, { id: 2, kind: 'project' });
+    await screen.findByRole('heading', { name: 'Ship' });
+    await fireEvent.click(screen.getAllByRole('button', { name: '[ delete ]' })[0]);
+    await fireEvent.click(screen.getByRole('button', { name: '[ yes ]' }));
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Build', 'Ship']));
+    const ups = screen.getAllByRole('button', { name: '[ up ]' });
+    const downs = screen.getAllByRole('button', { name: '[ down ]' });
+    expect(ups[0]).toBeDisabled();
+    expect(downs[0]).toBeEnabled();
+    expect(ups[1]).toBeEnabled();
+    expect(downs[1]).toBeDisabled();
+    await fireEvent.click(ups[1]);
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Ship', 'Build']));
+    expect(moves).toEqual([{ position: 0 }]);
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/projects/2/sections').length).toBeGreaterThanOrEqual(3);
   });
 });
 

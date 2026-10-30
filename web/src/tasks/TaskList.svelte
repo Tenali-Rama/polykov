@@ -69,8 +69,13 @@
     refs[sel]?.focus();
   }
 
+  /** Controls, and an open menu that marks itself `data-owns-keys` (the phone nav), keep their keys. */
+  function keepsKeys(target: EventTarget | null): boolean {
+    return ownsKeys(target) || (target instanceof HTMLElement && target.closest('[data-owns-keys]') !== null);
+  }
+
   function onkeydown(e: KeyboardEvent) {
-    if (e.ctrlKey || e.metaKey || e.altKey || ownsKeys(e.target) || rows.length === 0) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || keepsKeys(e.target) || rows.length === 0) return;
     if (e.key === 'j') move(1);
     else if (e.key === 'k') move(-1);
     else if (e.key === 'x' && sel >= 0) void refs[sel]?.toggle();

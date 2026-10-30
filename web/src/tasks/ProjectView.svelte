@@ -157,7 +157,8 @@
     act(async () => {
       await deleteSection(s.id);
       confirming = null;
-      sections = sections.filter((x) => x.id !== s.id);
+      // The server renumbers the remaining positions.
+      sections = await listSections(id);
       await loadTasks();
     }, 'add');
 

@@ -87,7 +87,7 @@
     bind:this={toggleEl}
     onclick={toggle}>[ lists ]</button
   >
-  <ul id="nav-menu" class="menu" class:open bind:this={menuEl}>
+  <ul id="nav-menu" class="menu" class:open bind:this={menuEl} data-owns-keys={open || undefined}>
     {#each links as l, i (l.href)}
       <li class:gap={i === LISTS.length || i === fixed.length}>
         <a href={l.href} aria-current={l.href === hash ? 'page' : undefined}>{l.label}</a>

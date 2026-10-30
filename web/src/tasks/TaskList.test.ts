@@ -200,6 +200,15 @@ describe('keys', () => {
     document.body.append(input);
     for (const key of ['j', 'x', 'Enter']) await fireEvent.keyDown(input, { key });
     await fireEvent.keyDown(screen.getByRole('button', { name: 'complete task 1' }), { key: 'j' });
+    // An open phone nav menu marks itself data-owns-keys; its links keep j/k/x.
+    const menu = document.createElement('ul');
+    menu.dataset.ownsKeys = 'true';
+    const link = document.createElement('a');
+    link.href = '#/inbox';
+    menu.append(link);
+    document.body.append(menu);
+    for (const key of ['j', 'x']) await fireEvent.keyDown(link, { key });
+    menu.remove();
     input.remove();
     expect(titles().some((a) => a.hasAttribute('aria-current'))).toBe(false);
     expect(urls(fetch, '/api/tasks')).toEqual([]);
