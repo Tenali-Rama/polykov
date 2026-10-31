@@ -17,6 +17,7 @@ describe('commands', () => {
       'go to anytime',
       'go to objects',
       'go to trash',
+      'go to views',
       'new task',
     ]);
   });
@@ -27,6 +28,8 @@ describe('commands', () => {
     expect(location.hash).toBe('#/today');
     run('go to trash');
     expect(location.hash).toBe('#/trash');
+    run('go to views');
+    expect(location.hash).toBe('#/views');
     run('go to objects');
     expect(location.hash).toBe('#/');
   });
@@ -57,7 +60,7 @@ describe('subsequence filter', () => {
     expect(labels('Upc')).toEqual(['go to upcoming']);
     expect(labels('new')).toEqual(['new task']);
     expect(labels('to t')).toEqual(['go to today', 'go to anytime', 'go to objects', 'go to trash']);
-    expect(labels('gos')).toEqual(['go to someday', 'go to objects', 'go to trash']);
+    expect(labels('gos')).toEqual(['go to someday', 'go to objects', 'go to trash', 'go to views']);
     expect(labels('gtr')).toEqual(['go to trash']);
     expect(labels('zzz')).toEqual([]);
   });

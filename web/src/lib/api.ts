@@ -3,9 +3,11 @@
 export type Health = { status: string; version: string };
 
 export class ApiError extends Error {
+  /** `at`: the character offset the server's `{"error","at"}` body points to (a query parse error). */
   constructor(
     readonly status: number,
     message: string,
+    readonly at?: number,
   ) {
     super(message);
   }
@@ -47,7 +49,10 @@ export async function send(method: Method, path: string, body?: unknown, signal?
     init.body = JSON.stringify(body);
   }
   const res = await fetch(path, init);
-  if (!res.ok) throw new ApiError(res.status, await errorText(res, path));
+  if (!res.ok) {
+    const { message, at } = await errorBody(res, path);
+    throw new ApiError(res.status, message, at);
+  }
   return res;
 }
 
@@ -56,14 +61,15 @@ export function post(path: string, body?: unknown, signal?: AbortSignal): Promis
   return send('POST', path, body, signal);
 }
 
-async function errorText(res: Response, path: string): Promise<string> {
+async function errorBody(res: Response, path: string): Promise<{ message: string; at?: number }> {
   try {
-    const body = (await res.json()) as { error?: unknown };
-    if (typeof body.error === 'string' && body.error !== '') return body.error;
+    const body = (await res.json()) as { error?: unknown; at?: unknown };
+    if (typeof body.error === 'string' && body.error !== '')
+      return { message: body.error, at: typeof body.at === 'number' ? body.at : undefined };
   } catch {
     // Empty or non-JSON body: use the generic message below.
   }
-  return `${path}: HTTP ${res.status}`;
+  return { message: `${path}: HTTP ${res.status}` };
 }
 
 /** Which screen to show: first-run setup, login, or the signed-in shell. */

@@ -51,7 +51,7 @@ describe('Nav', () => {
   it('lists the five lists, objects, trash, then projects and areas, marking the current one', async () => {
     const fetch = api();
     render(Nav);
-    await waitFor(() => expect(menu().getAllByRole('link', { hidden: true })).toHaveLength(9));
+    await waitFor(() => expect(menu().getAllByRole('link', { hidden: true })).toHaveLength(10));
     const links = menu().getAllByRole('link', { hidden: true });
     expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
       ['inbox', '#/inbox'],
@@ -61,6 +61,7 @@ describe('Nav', () => {
       ['anytime', '#/anytime'],
       ['objects', '#/'],
       ['trash', '#/trash'],
+      ['views', '#/views'],
       ['Launch', '#/p/7'],
       ['Work', '#/a/9'],
     ]);
@@ -74,7 +75,7 @@ describe('Nav', () => {
 
     location.hash = '#/p/7';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
-    await waitFor(() => expect(links[7]).toHaveAttribute('aria-current', 'page'));
+    await waitFor(() => expect(links[8]).toHaveAttribute('aria-current', 'page'));
     expect(links[1]).not.toHaveAttribute('aria-current');
   });
 
@@ -89,7 +90,7 @@ describe('Nav', () => {
     api(true);
     render(Nav);
     expect(await screen.findByText('nav: /api/projects: HTTP 500')).toBeInTheDocument();
-    expect(menu().getAllByRole('link', { hidden: true })).toHaveLength(7);
+    expect(menu().getAllByRole('link', { hidden: true })).toHaveLength(8);
   });
 
   it('[ lists ] opens the menu on its first link; arrows move; Esc closes and refocuses the button', async () => {
