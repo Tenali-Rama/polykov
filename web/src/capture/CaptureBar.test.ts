@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import CaptureBar from './CaptureBar.svelte';
 import type { Parsed, Token } from '../lib/smartadd';
+import { CAPTURE_OPEN, PALETTE_OPEN } from '../palette/commands';
 
 type Call = { url: string; body: { text: string; today: string }; signal?: AbortSignal | null };
 
@@ -228,5 +229,42 @@ describe('capture bar', () => {
     const chip = await screen.findByRole('button', { name: 'unparse +nope' });
     expect(chip.closest('li')).toHaveClass('unresolved');
     expect(dialog()!.querySelector('.mirror .tok.unresolved')).toHaveTextContent('+nope');
+  });
+
+  it('> typed into the empty line closes the bar and opens the palette with the rest', async () => {
+    const calls = stub();
+    const other = setup();
+    const opened = vi.fn((e: Event) => [(e as CustomEvent).detail, document.activeElement]);
+    window.addEventListener(PALETTE_OPEN, opened);
+    const input = await openBar(other);
+    await fireEvent.input(input, { target: { value: '>tod' } });
+    await waitFor(() => expect(dialog()).toBeNull());
+    expect(opened).toHaveBeenCalledTimes(1);
+    // The palette sees the element the bar was opened from as the one to return to.
+    expect(opened.mock.results[0].value).toEqual([{ text: 'tod' }, other]);
+    expect(calls).toEqual([]);
+    window.removeEventListener(PALETTE_OPEN, opened);
+  });
+
+  it('> after other text is title text, not a handoff', async () => {
+    const calls = stub();
+    setup();
+    const opened = vi.fn();
+    window.addEventListener(PALETTE_OPEN, opened);
+    const input = await openBar();
+    await fireEvent.input(input, { target: { value: 'a' } });
+    await fireEvent.input(input, { target: { value: '>a' } });
+    expect(opened).not.toHaveBeenCalled();
+    expect(dialog()).toBeInTheDocument();
+    await waitFor(() => expect(calls.at(-1)?.body.text).toBe('>a'));
+    window.removeEventListener(PALETTE_OPEN, opened);
+  });
+
+  it('the capture-open event opens it (the palette\'s new task)', async () => {
+    stub();
+    setup();
+    window.dispatchEvent(new CustomEvent(CAPTURE_OPEN));
+    const input = await screen.findByRole('textbox', { name: 'capture' });
+    await waitFor(() => expect(input).toHaveFocus());
   });
 });

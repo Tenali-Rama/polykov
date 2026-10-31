@@ -6,6 +6,7 @@
   import List from './objects/List.svelte';
   import Trash from './objects/Trash.svelte';
   import { listHref, parseHash } from './objects/route';
+  import Palette from './palette/Palette.svelte';
   import Nav from './tasks/Nav.svelte';
   import ProjectView from './tasks/ProjectView.svelte';
   import { parseTaskHash } from './tasks/route';
@@ -77,6 +78,7 @@
   {#if logoutError}<p class="err" role="alert">{logoutError}</p>{/if}
   <Nav />
   <CaptureBar />
+  <Palette />
 
   <section class="body">
     {#if taskRoute?.view === 'list'}

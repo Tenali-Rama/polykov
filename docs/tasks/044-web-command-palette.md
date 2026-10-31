@@ -2,7 +2,7 @@
 id: 044
 title: Add the web command palette with Ctrl+K, global search and > from the capture bar
 milestone: M3
-status: todo
+status: done
 deps: [039]
 touches: [web/src/palette/Palette.svelte, web/src/palette/Palette.test.ts, web/src/palette/commands.ts, web/src/palette/commands.test.ts, web/src/lib/search.ts, web/src/lib/search.test.ts, web/src/capture/CaptureBar.svelte, web/src/capture/CaptureBar.test.ts, web/src/Shell.svelte+, web/e2e/palette.spec.ts, web/API.md]
 spec: ["Organization", "Capture", "7. Clients & UI"]
@@ -40,4 +40,8 @@ spec: ["Organization", "Capture", "7. Clients & UI"]
 - Wiring the bottom `command` input to the palette (question for owner). Rebindable shortcuts (M16). Views in the command list (045 may add one line to `commands.ts`).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- Add a command with one line in `COMMANDS` (`palette/commands.ts`); `filterCommands` keeps list order, so put likelier commands first.
+- Search results go to `#/v/<id>` for views and `#/o/<id>` for everything else (projects/areas included, as the criterion says), via `lib/search.hitHref`.
+- Snippet marks render as `<mark>` without the brackets; the palette asks for `limit=10`.
+- Rows run on `mousedown` (default prevented) so focus stays in the input; the overlay has one Tab stop.
+- `>` handoff: the capture bar refocuses its opener before dispatching `polykov:palette-open`, so the palette's Esc returns there.
