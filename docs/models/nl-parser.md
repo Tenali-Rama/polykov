@@ -4,11 +4,11 @@
 From spec §5: extract date/time, recurrence, duration, priority, project, tags, area and deadline from one smart-add line, in **< 20 ms**, CPU only, fully local, within the 1 GB total model RAM. An ML candidate ships only if it beats the rules baseline. Winner rule (task 030): the most accurate candidate (whole-parse exact match) with p99 < 20 ms.
 
 ## Benchmark
-`parse/bench/cases.jsonl`, 333 cases (326 before task 051), built by `python3 parse/bench/gen.py` (deterministic). Each line: `{slice, input, today, projects, areas, expected:{title, scheduled, deadline, estimate_min, priority, recurrence, project, area, tags}}`. Expected values are what the person means, computed by the generator independently of any parser. No real personal data.
+`parse/bench/cases.jsonl`, 335 cases (326 before task 051, 333 before 056), built by `python3 parse/bench/gen.py` (deterministic). Each line: `{slice, input, today, projects, areas, expected:{title, scheduled, deadline, estimate_min, priority, recurrence, project, area, tags}}`. Expected values are what the person means, computed by the generator independently of any parser. No real personal data.
 
 | slice | n | what |
 |---|---|---|
-| `casual` | 93 | Hand-written (`parse/bench/hand.py`): abbreviations (`tmrw`, `thurs`, `weds`), odd word order, no-token titles (`read 1984`, `go by bus`), false-positive traps (`buy sun cream`, `watch friday night lights`, `order 3m tape`, `update monthly budget`), forms outside the baseline syntax (`noon`, `5 pm`, `30 mins`, `in two days`, `every other week`), and since 051 `yesterday` and `every N weeks on <weekdays>` (incl. the invalid `every 0 weeks on tue`). 4 of them cold. |
+| `casual` | 95 | Hand-written (`parse/bench/hand.py`): abbreviations (`tmrw`, `thurs`, `weds`), odd word order, no-token titles (`read 1984`, `go by bus`), false-positive traps (`buy sun cream`, `watch friday night lights`, `order 3m tape`, `update monthly budget`), forms outside the baseline syntax (`noon`, `5 pm`, `30 mins`, `in two days`, `every other week`), and since 051 `yesterday` and `every N weeks on <weekdays>` (incl. the invalid `every 0 weeks on tue`), and since 056 bare `every other week` and the trap `visit every other cousin`. 4 of them cold. |
 | `standard` | 120 | Synthetic from templates, 5 projects / 4 areas. ~15% use loose forms, ~12% trap titles, ~12% plain titles. |
 | `cold` | 60 | Synthetic, no known projects or areas (`+name` is a token with no value). |
 | `long` | 60 | Synthetic, 50 projects, 50 areas, tags from a 100-tag vocabulary. |
@@ -42,6 +42,8 @@ Metrics (`cargo run -p polykov-parse --release --example bench`): whole-parse ex
 | default | standard | 120 | 93.3 | 0.0 (10) | 14.0 | 43.0 | 338 | 75 |
 | default | cold | 60 | 96.7 | 33.3 (6) | 11.3 | 18.1 | 338 | 75 |
 | default | long | 60 | 93.3 | 0.0 (2) | 12.6 | 32.9 | 338 | 75 |
+| rules (056) | all | 335 | 90.1 | 28.2 (39) | 3.7 | 11.9 | 165 | 0 |
+| default (056) | all | 335 | **91.6** | 12.8 (39) | 11.8 | 32.7 | 253 | 71 |
 
 Per-field accuracy, all slices (%):
 
@@ -64,4 +66,5 @@ The bench prints the per-slice field table too. Peak RAM for `tagger` includes t
 ## Re-run log
 - 2026-10-30 (030): first run. Candidates rules, date-crate, tagger. Winner tagger. Regression gate `parse/tests/bench.rs` holds `default_parser()` at ≥ 89.2% exact (recorded 90.2 − 1).
 - 2026-10-31 (051): rules learn `yesterday` and `every [N|other] week[s] on <weekdays>`; 7 casual cases added (333 total); `model.bin` retrained on the regenerated `train.jsonl`. Same host, same 333 cases: rules 89.2%, old `model.bin` 90.4% (p99 38.3 µs), retrained 90.7% (p99 39.6 µs, false-token 13.2%, 71 KiB, ~250 KiB RAM). Recorded 030 score was 90.2% on 326 cases (p99 34.4 µs). Against the old model the retrain gains `next week kickoff` and one `long` line and loses one `standard` line; both models get all 7 new casual cases. Gate raised to ≥ 89.7% (recorded 90.7 − 1).
+- 2026-10-31 (056): rules read bare `every other week` as `every 2 weeks` (`every other` alone stays title text); recurrence rules split into `parse/src/rules/recur/`. 2 casual cases added (335 total); `train.jsonl` unchanged and `model.bin` not retrained (out of scope). Same `model.bin`: default 91.6% (307/335, p99 32.7 µs; on the 333 old cases 305, was 302: the `team retro`, `tidy the inbox` and `call the bank` lines with bare `every other week` now pass; `plan the offsite … every other week` still fails on `Tues`), rules 90.1%. Gate raised to ≥ 90.6% (recorded 91.6 − 1).
 - To re-run: `python3 parse/bench/gen.py` (only if the cases change), `cargo run -p polykov-parse --release --example bench`, and `-- --save-model` to retrain `model.bin`; then update this file and `RECORDED_EXACT`.
