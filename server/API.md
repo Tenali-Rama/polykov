@@ -80,6 +80,8 @@ Adding a migration: create `server/migrations/NNNN_<name>.sql` (next number, no 
 - `query::{parse(&str) -> Result<Query, ParseError>, Query { terms: Vec<Term>, archived: Archived }, Term { negated, filter: Filter }, ParseError { message, offset }}`: the pure view query parser (ADR 0015). Terms are whitespace-separated and ANDed, `-` negates one, and `"quotes"` keep spaces, `:` and `,` literal. `field:a,b` is OR within the field. A term without an unquoted `:` is `Filter::Text`. The fields are `type`, `tag` (`t` or `t/*` subtree), `status:open|done`, `priority` 1–4, the dates `due|scheduled|created|updated|completed`, `project`/`area` (id or `"title"`), `pinned:true|false`, and `archived:true|false|any`, which sets `Query.archived` (default `No`) instead of adding a term. `priority` and the dates take `=` (implicit), `<`, `<=`, `>`, `>=` per item, and the other fields take no operator. A date is `today|tomorrow|yesterday|YYYY-MM-DD|[+-]N(d|w|m)|none`. Relative dates stay `DateValue::Relative(n, Unit)` until `DateValue::resolve(today) -> Option<NaiveDate>`. `ParseError.offset` is a char index into the input.
 - `query::{compile(&Query, today: NaiveDate) -> Result<Compiled, ApiError>, Compiled { sql_where: String, params: Vec<Param> }, Param::{Value(rusqlite::types::Value), Search(String)}, FROM}`: the query as a `WHERE` rule over `query::FROM` (`objects LEFT JOIN tasks t ON t.object_id = objects.id`) referring to `?1..?n`, the `params` in order. Every user value is a parameter, never SQL text. A `Search` is a text term; `run` binds it as the JSON array of `search::matching_ids`. A relative date beyond chrono's range is `400 date is out of range`.
 - `query::{run(&Db, &Query, today: NaiveDate, limit: u32, offset: i64) -> Result<Page, ApiError>, Page { objects: Vec<Item>, total: i64 }, Item::{Task(Box<Task>), Object(Object)}}`: one page of the matching live objects in the object list order (pinned first, then `updated` newest first, then `id` highest first); a task serializes as the task JSON. `query::routes() -> Router<Db>`: `GET /api/query`, merged by `app::router`. `query::{DEFAULT_LIMIT (100), MAX_LIMIT (1000), MAX_QUERY_CHARS (1000)}`.
+- `views::routes() -> Router<Db>`: the view routes below, merged by `app::router`. `views::TYPE` (`"view"`).
+- `views::spec::{read(&Map<String, Value>) -> Result<Spec, Invalid>, query(&str) -> Result<Query, Invalid>, pick(field, value, options) -> Result<T, Invalid>, LAYOUTS, GROUPS, SORTS}`: a view's settings (ADR 0016). `Spec { query, layout: Layout, group: Group, sort: Sort }`; `Invalid { message, at: Option<usize> }` names the field (`at` for a query parse error) and `respond(status)` sends it.
 - `search::routes() -> Router<Db>`: `GET /api/search`, merged by `app::router`.
 - `search::matching_ids(&rusqlite::Connection, text: &str) -> Result<Vec<i64>, db::Error>` (also `search::store::matching_ids`): the ids of every live object (archived and completed included) that matches `text` under the rules of `GET /api/search` (short-only `text` matches title word starts only), best first; empty when `text` has no letters or digits. For filtering by text inside another query (views, the palette), e.g. `... AND id IN (SELECT value FROM json_each(?))` bound to the ids as a JSON array. Call it with the connection you already hold (`Db::conn`).
 - `search::store::{search(&Db, &Query) -> Result<Page, db::Error>, Query { text, type: Option<String>, limit: u32, offset: usize }, Page { hits: Vec<Hit>, total: usize }, Hit { id, score: f64, snippet }}`: one page of ranked hits; `Query` must already be validated. `search::fuzzy::{words, find, word_start, snippet, fold}`: the word splitting, per-text matching and snippet rules (ADR 0014). `search::{MAX_QUERY_CHARS (200), DEFAULT_LIMIT (20), MAX_LIMIT (100)}`.
@@ -386,6 +388,35 @@ Requires auth (`401` as in Authentication). Runs a view query (grammar in ADR 00
 - A text term matches the objects `GET /api/search` would find for it (archived and completed included, before the archived rule applies).
 
 Errors, each `400`: a query that does not parse is `{"error":"<message>","at":<char offset>}`; a relative date beyond the calendar's range is `{"error":"date is out of range"}`; `q` over 1000 characters is `{"error":"q must be at most 1000 characters"}`; a bad `today`, `limit` or `offset` gets the messages of the lists API. An unknown parameter gets axum's standard `400`.
+
+### Views
+Saved views (ADR 0016). All view routes require auth (`401` as in Authentication). A view is the object JSON (type `view`) whose `properties` hold its settings:
+```json
+{"id":9,"type":"view","title":"Work",...,"pinned":true,"properties":{"query":"type:task tag:work/*","layout":"kanban","group":"none","sort":"smart"}}
+```
+Rules, each failure a `400 {"error":"..."}`:
+- `query`: a view query (`GET /api/query`), at most 1000 characters (`query must be at most 1000 characters`). One that does not parse is `{"error":"query: <message>","at":<char offset>}`.
+- `layout`: `list|kanban|eisenhower` (`layout must be one of: list, kanban, eisenhower`); `group`: `none|status|priority|project|section|area|tag|type`; `sort`: `smart|priority|deadline|scheduled|created|updated|completed|title` (same message shape).
+- `title`: as for objects.
+
+Unknown fields, a wrong JSON type or an explicit `null` get axum's standard `422`. A non-integer `{id}` gets `400`; an id that is unknown, in the trash or not a view gets `404 {"error":"view not found"}`. Rename, delete and pin through `PATCH`/`DELETE /api/objects/{id}`; the web route for a view is `#/v/<id>`.
+
+#### `POST /api/views`
+Body `{"title":"...","query":"...","layout":"list","group":"none","sort":"smart","pinned":false}`; `title` and `query` required, the rest default as shown. `201` with the view.
+
+#### `GET /api/views`
+`200 {"views":[...]}`: live, non-archived views, pinned first, then by title (ignoring case), then id.
+
+#### `PATCH /api/views/{id}`
+Body with any of `title`, `query`, `layout`, `group`, `sort`, `pinned`; each given setting is checked as above and replaces only that property. Any given field sets `updated` to now; `{}` changes nothing. `200` with the view.
+
+#### `GET /api/views/{id}/items?today=YYYY-MM-DD`
+`200 {"view":{...},"groups":[{"key":...,"label":"...","items":[...]}],"total":n,"truncated":bool}`. Items are the task JSON for tasks, else the object JSON, matched by the view query as in `GET /api/query` (`today`, default the server's UTC date, anchors relative dates; a bad one gets `400 today must be a date YYYY-MM-DD`; an unknown parameter gets axum's standard `400`). `total` counts every match; only the first 500 in sort order are returned, and `truncated` says whether any were cut. Items keep the sort order within each group.
+- Sort: `smart` by smart score (ADR 0017), highest first; `created`/`updated`/`completed` newest first, ties by id descending; `priority` (P1 first), `deadline`, `scheduled` and `title` (ignoring case) ascending, ties by id. Unset values (and non-task objects for task fields) go last.
+- Group (only non-empty groups are listed): `none` gives one group `{"key":null,"label":"all"}`. `status` (`open`, `done`), `priority` (keys 1–4, labels `P1`–`P4`), `project`, `section`, `area` (key the id, label the title, by title ignoring case), `tag` (the object's first tag, by tag) and `type` (by type). An object without the value (a non-task for task fields, a trashed project or area) is in the group key `null`, label `none`, listed last. `area` is a task's own area, else its project's; a project groups by its own area.
+- `kanban` with `group: none` groups by `status`.
+- `eisenhower` ignores `group` and always returns four groups, in order: `urgent_important` (`urgent & important`), `important`, `urgent`, `neither`. Important: a task of priority 1 or 2. Urgent: a deadline or scheduled date (by its date) on or before today + 2 days, overdue included.
+- A stored view whose properties do not follow the rules above (edited through the object routes) gets `422` with the `400` message, e.g. `{"error":"layout must be one of: list, kanban, eisenhower"}` or `{"error":"query must be a string"}`.
 
 Malformed or missing JSON bodies get axum's standard `400`/`415`/`422` rejections. Store failures return a bare `500` and log a one-line cause.
 
