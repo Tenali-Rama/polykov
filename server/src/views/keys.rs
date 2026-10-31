@@ -1,10 +1,10 @@
 //! The sort and group keys of every object a view query matches, and the view's sort order.
 //! Only these small rows are read for all matches; full objects are loaded for the kept ones.
 
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashMap};
 
 use chrono::NaiveDate;
-use rusqlite::params_from_iter;
+use rusqlite::{Connection, Params, params_from_iter};
 
 use super::spec::Sort;
 use crate::{
@@ -54,6 +54,22 @@ pub fn select(db: &Db, query: &Query, today: NaiveDate) -> Result<Vec<Key>, ApiE
     let compiled = query::compile(query, today)?;
     let conn = db.conn()?;
     let args = query::bind(&conn, &compiled.params)?;
+    Ok(read(&conn, &compiled.sql_where, params_from_iter(&args))?)
+}
+
+/// The keys of the objects `ids`, in that order; an id with no object is left out.
+pub fn of(db: &Db, ids: &[i64]) -> Result<Vec<Key>, ApiError> {
+    let conn = db.conn()?;
+    let list = serde_json::Value::from(ids).to_string();
+    let rule = "objects.id IN (SELECT value FROM json_each(?1))";
+    let mut keys = read(&conn, rule, [list])?;
+    let at: HashMap<i64, usize> = ids.iter().enumerate().map(|(i, &id)| (id, i)).collect();
+    keys.sort_by_key(|k| at.get(&k.id).copied());
+    Ok(keys)
+}
+
+/// The keys of the rows of [`FROM`] that meet `rule`, with `args` bound.
+fn read(conn: &Connection, rule: &str, args: impl Params) -> Result<Vec<Key>, db::Error> {
     let sql = format!(
         "SELECT objects.id, objects.type, objects.title, objects.created, objects.updated, \
          t.completed, \
@@ -61,8 +77,7 @@ pub fn select(db: &Db, query: &Query, today: NaiveDate) -> Result<Vec<Key>, ApiE
          CASE WHEN objects.type = 'task' THEN COALESCE(t.priority, 4) END, \
          t.scheduled, t.deadline, t.estimate, vp.id, vp.title, vs.id, vs.title, va.id, va.title, \
          (SELECT MIN(tag) FROM object_tags WHERE object_id = objects.id) \
-         FROM {FROM} {JOINS} WHERE {}",
-        compiled.sql_where
+         FROM {FROM} {JOINS} WHERE {rule}"
     );
     let mut stmt = conn.prepare(&sql).map_err(db::Error::Sqlite)?;
     let pair = |r: &rusqlite::Row, i: usize| -> rusqlite::Result<Option<(i64, String)>> {
@@ -70,7 +85,7 @@ pub fn select(db: &Db, query: &Query, today: NaiveDate) -> Result<Vec<Key>, ApiE
             .zip(r.get::<_, Option<String>>(i + 1)?))
     };
     let keys = stmt
-        .query_map(params_from_iter(&args), |r| {
+        .query_map(args, |r| {
             Ok(Key {
                 id: r.get(0)?,
                 r#type: r.get(1)?,

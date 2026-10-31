@@ -1,6 +1,7 @@
-//! GTD lists (spec "Tasks (GTD)", "Capture"): `GET /api/lists/{name}` and `GET
-//! /api/tasks/{id}/subtasks`. Every route requires auth.
+//! GTD lists (spec "Tasks (GTD)", "Capture"): `GET /api/lists/{name}`, `GET
+//! /api/lists/{name}/items` and `GET /api/tasks/{id}/subtasks`. Every route requires auth.
 
+mod layout;
 pub mod store;
 
 use axum::{
@@ -29,6 +30,7 @@ pub const MAX_LIMIT: u32 = 1000;
 pub fn routes() -> Router<Db> {
     Router::new()
         .route("/api/lists/{name}", get(list))
+        .route("/api/lists/{name}/items", get(layout::items))
         .route("/api/tasks/{id}/subtasks", get(subtasks))
 }
 
