@@ -1,8 +1,10 @@
 <script lang="ts">
   // Global capture bar: Ctrl+Space from anywhere opens it; each keystroke re-parses the line
-  // (cancelling the previous parse) to highlight tokens; Enter saves through smart add.
+  // (cancelling the previous parse) to highlight tokens; Enter saves through smart add. A `>`
+  // typed into the empty line hands over to the command palette.
   import { tick } from 'svelte';
   import { add, landing, localToday, parse, type Parsed, type Token } from '../lib/smartadd';
+  import { CAPTURE_OPEN, PALETTE_OPEN } from '../palette/commands';
   import { chips, quote, segments } from './highlight';
 
   const NOTE_MS = 4000;
@@ -12,6 +14,8 @@
   // The latest applied parse and the text it was for; highlighting needs offsets that match.
   let parsed = $state<Parsed | null>(null);
   let parsedText = $state('');
+  // The text before the latest input, to tell a `>` typed into an empty line.
+  let before = '';
   let error = $state('');
   let note = $state('');
   let saving = false;
@@ -34,8 +38,13 @@
         void show();
       }
     };
+    const onopen = () => void show();
     window.addEventListener('keydown', onkey, true);
-    return () => window.removeEventListener('keydown', onkey, true);
+    window.addEventListener(CAPTURE_OPEN, onopen);
+    return () => {
+      window.removeEventListener('keydown', onkey, true);
+      window.removeEventListener(CAPTURE_OPEN, onopen);
+    };
   });
 
   async function show() {
@@ -53,12 +62,29 @@
     pending = null;
     open = false;
     text = '';
+    before = '';
     parsed = null;
     parsedText = '';
     error = '';
     await tick();
     returnTo?.focus();
     returnTo = null;
+  }
+
+  function oninput() {
+    const was = before;
+    before = text;
+    if (was === '' && text.startsWith('>')) void toPalette(text.slice(1));
+    else void reparse();
+  }
+
+  /** Closes the bar and opens the palette with `rest`; the palette's Esc returns to where the bar was opened from. */
+  async function toPalette(rest: string) {
+    const back = returnTo;
+    returnTo = null;
+    back?.focus();
+    window.dispatchEvent(new CustomEvent(PALETTE_OPEN, { detail: { text: rest } }));
+    await close();
   }
 
   async function reparse() {
@@ -160,7 +186,7 @@
         <input
           bind:this={input}
           bind:value={text}
-          oninput={reparse}
+          {oninput}
           onscroll={syncScroll}
           onkeyup={syncScroll}
           onclick={syncScroll}
