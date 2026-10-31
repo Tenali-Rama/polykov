@@ -32,9 +32,9 @@ Words are matched left to right, ignoring case; a phrase is whole words. For a f
 | Date | `today`/`tod`, `tomorrow`/`tmrw`/`tmr`, `yesterday`, weekday names and 3-letter abbreviations (next such day, today included), `next week` (next Monday), `next month` (the 1st), `in N days\|weeks\|months`, `nov 12`/`12 nov`/`november 12th` (next year if past), `2026-11-12` |
 | Time | `5pm`, `5:30pm`, `17:00`, `at 17`, `at 5pm` |
 | Deadline | `due <date> [time]`, `by <date> [time]` |
-| Recurrence | `every day\|weekday\|week\|month\|year`, `daily`…`yearly`, `every <weekday>[, and <weekday>…]`, `every N days\|weeks\|months\|years` (N 1–365), `every 15th`, `every week\|N weeks\|other week on <weekday>[, and <weekday>…]` (`other` = 2, needs `on`); `every!` counts from completion |
+| Recurrence | `every day\|weekday\|week\|month\|year`, `daily`…`yearly`, `every <weekday>[, and <weekday>…]`, `every N days\|weeks\|months\|years` (N 1–365), `every other week` (= `every 2 weeks`), `every 15th`, `every week\|N weeks\|other week on <weekday>[, and <weekday>…]` (`other` = 2); `every!` counts from completion |
 
-- `every <bad count> week[s] on <weekdays>` (`every 0 weeks on tue`) stays title text, weekdays included.
+- `every <bad count> week[s] on <weekdays>` (`every 0 weeks on tue`) stays title text, weekdays included. `every other` not followed by `week` is title text.
 - `scheduled` = the date, else the recurrence's first occurrence on or after today, else today if a time was given; plus the time if any. A deadline never sets `scheduled`.
 - `"quoted text"` is never parsed and a phrase never spans it; the paired quotes are dropped from the title. An unpaired `"` is plain text.
 - `title` is the input minus tokens and paired quotes, whitespace collapsed.

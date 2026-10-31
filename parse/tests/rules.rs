@@ -140,6 +140,33 @@ fn every_n_weeks_on_weekdays() {
 }
 
 #[test]
+fn bare_every_other_week_is_every_two_weeks() {
+    let p = parse("water plants every other week");
+    let two = parse("water plants every 2 weeks");
+    assert_eq!(p.title, "water plants");
+    assert_eq!(
+        p.recurrence.as_ref().map(|r| r.rule.as_str()),
+        Some("FREQ=WEEKLY;INTERVAL=2")
+    );
+    assert_eq!(
+        (&p.recurrence, &p.scheduled),
+        (&two.recurrence, &two.scheduled)
+    );
+    assert_eq!(p.scheduled.as_deref(), Some("2026-10-30"));
+    assert_eq!(kinds(&p), [(Kind::Recurrence, "every other week")]);
+}
+
+#[test]
+fn every_other_without_week_stays_title_text() {
+    for input in ["call every other", "visit every other cousin"] {
+        let p = parse(input);
+        assert_eq!(p.title, input);
+        assert_eq!((&p.recurrence, &p.scheduled), (&None, &None), "{input}");
+        assert!(p.tokens.is_empty(), "{input}");
+    }
+}
+
+#[test]
 fn zero_weeks_on_a_weekday_stays_title_text() {
     let p = parse("sync every 0 weeks on tue p2");
     assert_eq!(p.title, "sync every 0 weeks on tue");
