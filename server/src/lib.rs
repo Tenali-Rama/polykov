@@ -19,4 +19,5 @@ pub mod smartsort;
 pub mod tags;
 pub mod tasks;
 pub mod trash;
+pub mod views;
 pub mod web;
