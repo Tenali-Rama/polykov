@@ -42,7 +42,7 @@ pub(super) struct Params {
 
 /// One group of items, in the view's sort order.
 #[derive(Serialize)]
-struct Bucket {
+pub(crate) struct Bucket {
     key: Value,
     label: String,
     items: Vec<Item>,
@@ -77,11 +77,7 @@ fn build(db: &Db, id: i64, today: NaiveDate) -> Result<Response, ApiError> {
     keys::sort(&mut keys, spec.sort, today);
     let total = keys.len();
     keys.truncate(MAX_ITEMS);
-    let groups = match (spec.layout, spec.group) {
-        (Layout::Eisenhower, _) => eisenhower(db, &keys, today)?,
-        (Layout::Kanban, Group::None) => grouped(db, &keys, Group::Status)?,
-        (_, group) => grouped(db, &keys, group)?,
-    };
+    let groups = group(&keys, spec.layout, spec.group, today, |k| load(db, k))?;
     let body = json!({
         "view": view,
         "groups": groups,
@@ -91,8 +87,28 @@ fn build(db: &Db, id: i64, today: NaiveDate) -> Result<Response, ApiError> {
     Ok(Json(body).into_response())
 }
 
+/// The keys in the groups of `layout` and `by` (ADR 0016), each item read by `load`: `kanban`
+/// with `none` groups by status, `eisenhower` ignores `by`.
+pub(crate) fn group(
+    keys: &[Key],
+    layout: Layout,
+    by: Group,
+    today: NaiveDate,
+    load: impl FnMut(&Key) -> Result<Option<Item>, ApiError>,
+) -> Result<Vec<Bucket>, ApiError> {
+    match (layout, by) {
+        (Layout::Eisenhower, _) => eisenhower(keys, today, load),
+        (Layout::Kanban, Group::None) => grouped(keys, Group::Status, load),
+        (_, by) => grouped(keys, by, load),
+    }
+}
+
 /// The keys in groups by `by`, each group keeping their order.
-fn grouped(db: &Db, keys: &[Key], by: Group) -> Result<Vec<Bucket>, ApiError> {
+fn grouped(
+    keys: &[Key],
+    by: Group,
+    mut load: impl FnMut(&Key) -> Result<Option<Item>, ApiError>,
+) -> Result<Vec<Bucket>, ApiError> {
     let mut groups: BTreeMap<Rank, Bucket> = BTreeMap::new();
     for k in keys {
         let (rank, key, label) = place(k, by);
@@ -101,7 +117,7 @@ fn grouped(db: &Db, keys: &[Key], by: Group) -> Result<Vec<Bucket>, ApiError> {
             label,
             items: Vec::new(),
         });
-        bucket.items.extend(load(db, k)?);
+        bucket.items.extend(load(k)?);
     }
     Ok(groups.into_values().collect())
 }
@@ -134,7 +150,11 @@ fn place(k: &Key, by: Group) -> (Rank, Value, String) {
 }
 
 /// The four Eisenhower quadrants, always all four, in order.
-fn eisenhower(db: &Db, keys: &[Key], today: NaiveDate) -> Result<Vec<Bucket>, ApiError> {
+fn eisenhower(
+    keys: &[Key],
+    today: NaiveDate,
+    mut load: impl FnMut(&Key) -> Result<Option<Item>, ApiError>,
+) -> Result<Vec<Bucket>, ApiError> {
     let quadrants = [
         ("urgent_important", "urgent & important"),
         ("important", "important"),
@@ -164,7 +184,7 @@ fn eisenhower(db: &Db, keys: &[Key], today: NaiveDate) -> Result<Vec<Bucket>, Ap
             (true, false) => 2,
             (false, false) => 3,
         };
-        groups[quadrant].items.extend(load(db, k)?);
+        groups[quadrant].items.extend(load(k)?);
     }
     Ok(groups)
 }

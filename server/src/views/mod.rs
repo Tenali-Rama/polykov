@@ -3,8 +3,8 @@
 //! `GET /api/views/{id}/items`. Every route requires auth; rename, delete and pin go through
 //! the object routes.
 
-mod items;
-mod keys;
+pub(crate) mod items;
+pub(crate) mod keys;
 pub mod spec;
 
 use axum::{
