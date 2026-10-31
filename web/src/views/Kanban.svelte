@@ -1,48 +1,35 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { hitHref } from '../lib/search';
-  import { isTask, viewItems, type Group, type Item } from '../lib/views';
-  import { TASKS_CHANGED } from '../tasks/TaskList.svelte';
-  import { boardGroup, columns, movable, moveTask } from './move';
+  import { isTask, type Group, type Item } from '../lib/views';
+  import { columns, movable, moveTask } from './move';
+  import { loader, type Source } from './source';
 
-  // `id`: the view, read once (ViewPage re-creates the layout after an edit).
-  let { id }: { id: number } = $props();
+  // `source`: the items, read once (ViewPage re-creates the layout after an edit).
+  let { source }: { source: Source } = $props();
 
   let cols = $state<Group[]>([]);
-  let group = $state<ReturnType<typeof boardGroup>>('status');
+  const group = $derived(source.group);
   let loaded = $state(false);
   let truncated = $state<{ shown: number; total: number } | null>(null);
   let error = $state('');
   let board = $state<HTMLElement>();
   // The card being dragged, kept here because jsdom and some browsers drop `dataTransfer` data.
   let dragging: At | null = null;
-  // Bumped per request so a slow, stale response never overwrites a newer one.
-  let seq = 0;
 
   const canMove = $derived(movable(group));
   const count = $derived(cols.reduce((n, c) => n + c.items.length, 0));
 
-  onMount(() => {
-    void load();
-    const reload = () => void load();
-    window.addEventListener(TASKS_CHANGED, reload);
-    return () => window.removeEventListener(TASKS_CHANGED, reload);
-  });
-
-  async function load() {
-    const mine = ++seq;
-    error = '';
-    try {
-      const data = await viewItems(id);
-      if (mine !== seq) return;
-      group = boardGroup(data.view);
+  const { load, watch } = loader(
+    untrack(() => source),
+    (data) => {
       cols = columns(group, data.groups);
       truncated = data.truncated ? { shown: data.groups.flatMap((g) => g.items).length, total: data.total } : null;
       loaded = true;
-    } catch (e) {
-      if (mine === seq) error = `error: ${message(e)}`;
-    }
-  }
+    },
+    (e) => (error = e),
+  );
+  onMount(watch);
 
   function message(e: unknown): string {
     return e instanceof Error ? e.message : String(e);

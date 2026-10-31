@@ -1,84 +1,39 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { hitHref } from '../lib/search';
-  import { localToday, type Row, type Task } from '../lib/tasks';
-  import { isTask, viewItems, type Items } from '../lib/views';
-  import { ownsKeys } from '../objects/route';
-  import { TASKS_CHANGED } from '../tasks/TaskList.svelte';
+  import { localToday } from '../lib/tasks';
+  import { isTask } from '../lib/views';
   import TaskRow from '../tasks/TaskRow.svelte';
+  import { indexed, loader, rowKey, taskRow, type Loaded, type Source } from './source';
 
-  // `id`: the view, read once (ViewPage re-creates the layout after an edit).
-  let { id }: { id: number } = $props();
+  // `source`: the items, read once (ViewPage re-creates the layout after an edit).
+  let { source }: { source: Source } = $props();
 
-  let data = $state<Items | null>(null);
+  let data = $state<Loaded | null>(null);
   let error = $state('');
   let today = $state(localToday());
   // -1: nothing selected yet, so the first `j` selects the first item.
   let sel = $state(-1);
   const rows: (TaskRow | undefined)[] = $state([]);
   const links: (HTMLAnchorElement | undefined)[] = $state([]);
-  // Bumped per request so a slow, stale response never overwrites a newer one.
-  let seq = 0;
 
-  /** The server's four quadrants in its order, each item with its index across them (the j/k order). */
-  const quadrants = $derived.by(() => {
-    let i = 0;
-    return (data?.groups ?? []).map((g) => ({ ...g, items: g.items.map((item) => ({ item, i: i++ })) }));
-  });
+  /** The four quadrants in the server's order. */
+  const quadrants = $derived(indexed(data?.groups ?? []));
   const flat = $derived(quadrants.flatMap((q) => q.items.map((x) => x.item)));
 
-  onMount(() => {
-    void load();
-    const reload = () => void load();
-    window.addEventListener(TASKS_CHANGED, reload);
-    return () => window.removeEventListener(TASKS_CHANGED, reload);
-  });
-
-  async function load() {
-    const mine = ++seq;
-    error = '';
-    try {
-      const next = await viewItems(id);
-      if (mine !== seq) return;
+  const { watch } = loader(
+    untrack(() => source),
+    (next) => {
       today = localToday();
       data = next;
       sel = -1;
-    } catch (e) {
-      if (mine === seq) error = `error: ${e instanceof Error ? e.message : String(e)}`;
-    }
-  }
-
-  /** Items carry no sub-task counts, so their rows show none. */
-  function row(item: Task): Row {
-    return { ...item, subtasks: { open: 0, total: 0 } };
-  }
-
-  function focus(i: number) {
-    if (rows[i]) rows[i].focus();
-    else links[i]?.focus();
-  }
-
-  /** Completes (or reopens) the selected task, then reloads every list so it can change quadrant. */
-  async function toggle(i: number) {
-    await rows[i]?.toggle();
-    window.dispatchEvent(new Event(TASKS_CHANGED));
-  }
-
-  function keepsKeys(target: EventTarget | null): boolean {
-    return ownsKeys(target) || (target instanceof HTMLElement && target.closest('[data-owns-keys]') !== null);
-  }
+    },
+    (e) => (error = e),
+  );
+  onMount(watch);
 
   function onkeydown(e: KeyboardEvent) {
-    if (e.ctrlKey || e.metaKey || e.altKey || keepsKeys(e.target) || flat.length === 0) return;
-    if (e.key === 'j' || e.key === 'k') {
-      sel = Math.min(Math.max(sel + (e.key === 'j' ? 1 : -1), 0), flat.length - 1);
-      focus(sel);
-    } else if (e.key === 'x' && sel >= 0 && rows[sel]) void toggle(sel);
-    // A focused link follows itself on Enter (a selected item's link is focused).
-    else if (e.key === 'Enter' && sel >= 0 && !(e.target instanceof HTMLAnchorElement))
-      location.hash = hitHref(flat[sel]);
-    else return;
-    e.preventDefault();
+    sel = rowKey(e, sel, flat, { rows, links }) ?? sel;
   }
 </script>
 
@@ -96,7 +51,7 @@
           <ul class="rows">
             {#each q.items as { item, i } (item.id)}
               {#if isTask(item)}
-                <TaskRow row={row(item)} {today} selected={i === sel} onfocus={() => (sel = i)} bind:this={rows[i]} />
+                <TaskRow row={taskRow(item)} {today} selected={i === sel} onfocus={() => (sel = i)} bind:this={rows[i]} />
               {:else}
                 <li class="obj" class:sel={i === sel}>
                   <span class="dim">{item.type}</span>
