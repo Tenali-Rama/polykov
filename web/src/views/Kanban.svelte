@@ -15,7 +15,7 @@
   let error = $state('');
   let board = $state<HTMLElement>();
   // The card being dragged, kept here because jsdom and some browsers drop `dataTransfer` data.
-  let dragging: number | null = null;
+  let dragging: At | null = null;
   // Bumped per request so a slow, stale response never overwrites a newer one.
   let seq = 0;
 
@@ -48,8 +48,11 @@
     return e instanceof Error ? e.message : String(e);
   }
 
+  /** A card's place on the board: its column and row. A task can be in several columns of a `tag` board. */
+  type At = { c: number; r: number };
+
   /** The column and row of card `itemId`, or `null`. */
-  function find(itemId: number): { c: number; r: number } | null {
+  function find(itemId: number): At | null {
     for (let c = 0; c < cols.length; c++) {
       const r = cols[c].items.findIndex((x) => x.id === itemId);
       if (r >= 0) return { c, r };
@@ -57,14 +60,16 @@
     return null;
   }
 
-  function focusCard(itemId: number) {
-    board?.querySelector<HTMLElement>(`[data-card="${itemId}"]`)?.focus();
+  function focusCard({ c, r }: At) {
+    board?.querySelector<HTMLElement>(`[data-c="${c}"][data-r="${r}"]`)?.focus();
   }
 
-  /** Moves a card to column `to` at once, then asks the server; a failure puts it back. */
-  async function move(itemId: number, to: number) {
-    const at = find(itemId);
-    if (!at || at.c === to || to < 0 || to >= cols.length) return;
+  /**
+   * Moves the card at `at` to column `to` at once, then asks the server; a failure puts it back.
+   * Completing a recurring task reloads the board, so the next occurrence shows.
+   */
+  async function move(at: At, to: number) {
+    if (at.c === to || to < 0 || to >= cols.length) return;
     const item = cols[at.c].items[at.r];
     error = '';
     if (!canMove) return void (error = 'read-only grouping');
@@ -73,36 +78,41 @@
     cols[at.c].items.splice(at.r, 1);
     cols[to].items.push(item);
     await tick();
-    focusCard(itemId);
+    focusCard({ c: to, r: cols[to].items.length - 1 });
     try {
-      const task = await moveTask(group, itemId, cols[to].key);
-      const now = find(itemId);
+      const { task, next } = await moveTask(group, item.id, cols[to].key);
+      const now = find(item.id);
       if (now) cols[now.c].items[now.r] = task;
+      if (next) {
+        await load();
+        await tick();
+        const moved = find(item.id);
+        if (moved) focusCard(moved);
+      }
     } catch (e) {
       cols = before;
       error = `error: ${message(e)}`;
       await tick();
-      focusCard(itemId);
+      focusCard(at);
     }
   }
 
   function onkeydown(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey || e.altKey || !(e.target instanceof HTMLElement)) return;
     const card = e.target.closest<HTMLElement>('[data-card]');
-    const at = card ? find(Number(card.dataset.card)) : null;
-    if (!at) return;
+    if (!card) return;
+    const at = { c: Number(card.dataset.c), r: Number(card.dataset.r) };
     const step = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
-    if (step !== 0 && e.shiftKey) void move(cols[at.c].items[at.r].id, at.c + step);
+    if (step !== 0 && e.shiftKey) void move(at, at.c + step);
     else if (e.shiftKey) return;
     else if (step !== 0) {
       // The nearest column that way with a card in it, at the same row or its last one.
       let c = at.c + step;
       while (c >= 0 && c < cols.length && cols[c].items.length === 0) c += step;
-      if (c >= 0 && c < cols.length) focusCard(cols[c].items[Math.min(at.r, cols[c].items.length - 1)].id);
+      if (c >= 0 && c < cols.length) focusCard({ c, r: Math.min(at.r, cols[c].items.length - 1) });
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      const items = cols[at.c].items;
-      const r = Math.min(Math.max(at.r + (e.key === 'ArrowDown' ? 1 : -1), 0), items.length - 1);
-      focusCard(items[r].id);
+      const last = cols[at.c].items.length - 1;
+      focusCard({ c: at.c, r: Math.min(Math.max(at.r + (e.key === 'ArrowDown' ? 1 : -1), 0), last) });
     } else return;
     e.preventDefault();
   }
@@ -135,15 +145,17 @@
       >
         <h2>{col.label} <span class="dim">{col.items.length}</span></h2>
         <ul aria-label={col.label}>
-          {#each col.items as item (item.id)}
+          {#each col.items as item, r (item.id)}
             <li>
               <a
                 class="card"
                 href={hitHref(item)}
                 data-card={item.id}
+                data-c={c}
+                data-r={r}
                 draggable={draggable(item)}
                 ondragstart={(e) => {
-                  dragging = item.id;
+                  dragging = { c, r };
                   e.dataTransfer?.setData('text/plain', String(item.id));
                 }}
                 ondragend={() => (dragging = null)}

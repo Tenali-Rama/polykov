@@ -2,7 +2,7 @@
 id: 057
 title: Fix the Kanban priority-none display, recurring done moves and tag-board arrow keys
 milestone: M4
-status: todo
+status: done
 deps: []
 touches: [web/src/views/Kanban.svelte, web/src/views/Kanban.test.ts, web/src/views/move.ts, web/src/views/move.test.ts, web/e2e/kanban.spec.ts, web/API.md]
 spec: ["Tasks (GTD)", "7. Clients & UI"]
@@ -22,4 +22,7 @@ Three Kanban bugs from the M3 review are fixed: priority boards agree with the s
 - Changing the server's groups. The shared layout loader (task 059).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- A `priority` board has exactly `P1`, `P2`, `P3`, `P4 · none`; the server's `none` group (non-task objects, since tasks default to 4) is merged into `P4 · none` by `columns`.
+- `moveTask` now returns `{ task, next }`; the board reloads only when `next` is set (recurring completion) and refocuses the moved card.
+- Cards carry `data-c`/`data-r`; keys, drag and focus go by position, never by task id, so `tag` boards with a task in several columns behave.
+- The `P4 · none` label is the default named in the task; the owner may rename it in `move.ts` (`FIXED`).

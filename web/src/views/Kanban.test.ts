@@ -20,6 +20,7 @@ const PRIORITY: Group[] = [
   { key: 3, label: 'P3', items: [task(2, { priority: 3 }), task(3, { priority: 3 })] },
   { key: null, label: 'none', items: [makeObj(5, { title: 'Idea' })] },
 ];
+const P4 = 'P4 · none';
 const body = (init?: RequestInit) => JSON.parse(String(init?.body));
 
 function api(group: View['properties']['group'], groups: Group[], more: Record<string, Route> = {}) {
@@ -30,6 +31,8 @@ function api(group: View['properties']['group'], groups: Group[], more: Record<s
   });
 }
 
+const loadsOf = (fetch: ReturnType<typeof stubApi>) =>
+  fetch.mock.calls.filter(([url]) => url.startsWith('/api/views/4/items')).length;
 const column = (name: string) => within(screen.getByRole('list', { name }));
 const card = (name: RegExp) => screen.getByRole('link', { name });
 
@@ -44,14 +47,13 @@ describe('Kanban', () => {
       'P1 1',
       'P2 0',
       'P3 2',
-      'P4 0',
-      'none 1',
+      'P4 · none 1',
     ]);
     const first = column('P1').getByRole('link');
     expect(first).toHaveTextContent('p1 task 1 2026-11-02 due 2026-11-05');
     expect(first).toHaveAttribute('href', '#/o/1');
     expect(first).toHaveAttribute('draggable', 'true');
-    expect(column('none').getByRole('link', { name: /Idea/ })).toHaveAttribute('draggable', 'false');
+    expect(column(P4).getByRole('link', { name: /Idea/ })).toHaveAttribute('draggable', 'false');
     expect(screen.queryByText('read-only grouping')).toBeNull();
   });
 
@@ -107,6 +109,60 @@ describe('Kanban', () => {
     );
   });
 
+  it('completing a recurring task reloads the board, so its next occurrence shows in open', async () => {
+    let loads = 0;
+    const fetch = stubApi({
+      'GET /api/views/4/items': () => {
+        loads++;
+        const groups: Group[] =
+          loads === 1
+            ? [{ key: 'open', label: 'open', items: [task(1)] }]
+            : [
+                { key: 'open', label: 'open', items: [task(8)] },
+                { key: 'done', label: 'done', items: [task(1, { status: 'done' })] },
+              ];
+        return Response.json({ view: view('status'), groups, total: groups.length, truncated: false });
+      },
+      'POST /api/tasks/1/complete': () => Response.json({ task: task(1, { status: 'done' }), next: task(8) }),
+    });
+    render(Kanban, { id: 4 });
+    const one = await screen.findByRole('link', { name: /task 1/ });
+    one.focus();
+    await fireEvent.keyDown(one, { key: 'ArrowRight', shiftKey: true });
+    expect(await column('open').findByRole('link', { name: /task 8/ })).toHaveAttribute('href', '#/o/8');
+    await waitFor(() => expect(column('done').getByRole('link', { name: /task 1/ })).toHaveFocus());
+    expect(loadsOf(fetch)).toBe(2);
+  });
+
+  it('a move without a next occurrence does not reload', async () => {
+    const fetch = api('none', [{ key: 'open', label: 'open', items: [task(1)] }], {
+      'POST /api/tasks/1/complete': () => Response.json({ task: task(1, { status: 'done' }), next: null }),
+    });
+    render(Kanban, { id: 4 });
+    const one = await screen.findByRole('link', { name: /task 1/ });
+    one.focus();
+    await fireEvent.keyDown(one, { key: 'ArrowRight', shiftKey: true });
+    await waitFor(() => expect(column('done').getByRole('link', { name: /task 1/ })).toHaveFocus());
+    expect(loadsOf(fetch)).toBe(1);
+  });
+
+  it('on a tag board, arrows follow the column of the focused card, not its task id', async () => {
+    api('tag', [
+      { key: 'home', label: 'home', items: [task(1), task(2)] },
+      { key: 'work', label: 'work', items: [task(3), task(1), task(4)] },
+    ]);
+    render(Kanban, { id: 4 });
+    await screen.findByRole('list', { name: 'work' });
+    const inWork = column('work').getByRole('link', { name: /task 1/ });
+    inWork.focus();
+    await fireEvent.keyDown(inWork, { key: 'ArrowDown' });
+    expect(column('work').getByRole('link', { name: /task 4/ })).toHaveFocus();
+    await fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' });
+    expect(inWork).toHaveFocus();
+    await fireEvent.keyDown(inWork, { key: 'ArrowLeft' });
+    expect(column('home').getByRole('link', { name: /task 2/ })).toHaveFocus();
+  });
+
   it('a failed drop shows the server error and puts the card back', async () => {
     api('priority', PRIORITY, {
       'PATCH /api/tasks/1': () => Response.json({ error: 'priority must be 1 to 4' }, { status: 400 }),
@@ -114,11 +170,11 @@ describe('Kanban', () => {
     render(Kanban, { id: 4 });
     const one = await screen.findByRole('link', { name: /task 1/ });
     await fireEvent.dragStart(one);
-    await fireEvent.dragOver(screen.getByRole('region', { name: 'P4' }));
-    await fireEvent.drop(screen.getByRole('region', { name: 'P4' }));
+    await fireEvent.dragOver(screen.getByRole('region', { name: P4 }));
+    await fireEvent.drop(screen.getByRole('region', { name: P4 }));
     expect(await screen.findByRole('alert')).toHaveTextContent('error: priority must be 1 to 4');
     expect(column('P1').getByRole('link', { name: /task 1/ })).toBeInTheDocument();
-    expect(column('P4').queryAllByRole('link')).toHaveLength(0);
+    expect(column(P4).queryAllByRole('link', { name: /task 1/ })).toHaveLength(0);
   });
 
   it('a tag board is read-only: it says so, nothing drags and a move sends nothing', async () => {

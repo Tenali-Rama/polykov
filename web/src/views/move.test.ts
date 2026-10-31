@@ -20,8 +20,9 @@ describe('planMove', () => {
     expect(planMove('status', null)).toBeNull();
   });
 
-  it('priority: sets it, and none sets the no-priority 4', () => {
+  it('priority: sets it, and P4 · none sets the no-priority 4', () => {
     expect(planMove('priority', 2)).toEqual({ call: 'patch', task: { priority: 2 } });
+    expect(planMove('priority', 4)).toEqual({ call: 'patch', task: { priority: 4 } });
     expect(planMove('priority', null)).toEqual({ call: 'patch', task: { priority: 4 } });
   });
 
@@ -46,8 +47,14 @@ describe('planMove', () => {
 describe('moveTask', () => {
   it('a move to done completes the task through POST', async () => {
     const fetch = stubApi({ 'POST /api/tasks/7/complete': () => Response.json({ task: done, next: null }) });
-    expect(await moveTask('status', 7, 'done')).toEqual(done);
+    expect(await moveTask('status', 7, 'done')).toEqual({ task: done, next: null });
     expect(fetch.mock.calls[0][0]).toMatch(/^\/api\/tasks\/7\/complete\?today=\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('completing a recurring task returns its next occurrence', async () => {
+    const next = makeRow(8);
+    stubApi({ 'POST /api/tasks/7/complete': () => Response.json({ task: done, next }) });
+    expect(await moveTask('status', 7, 'done')).toEqual({ task: done, next });
   });
 
   it('a move to open reopens it', async () => {
@@ -72,20 +79,30 @@ describe('moveTask', () => {
 
 describe('columns', () => {
   const note = makeObj(9);
+  const plain = makeRow(2);
   const groups: Group[] = [
     { key: 2, label: 'P2', items: [makeRow(1, { priority: 2 })] },
+    { key: 4, label: 'P4', items: [plain] },
     { key: null, label: 'none', items: [note] },
   ];
 
-  it('adds the empty fixed columns in order and keeps none last', () => {
-    expect(columns('priority', groups).map((g) => [g.label, g.items.length])).toEqual([
-      ['P1', 0],
-      ['P2', 1],
-      ['P3', 0],
-      ['P4', 0],
-      ['none', 1],
+  it('priority: exactly P1 to P4 · none, and the objects without a priority join P4 · none', () => {
+    const cols = columns('priority', groups);
+    expect(cols.map((g) => [g.key, g.label, g.items.length])).toEqual([
+      [1, 'P1', 0],
+      [2, 'P2', 1],
+      [3, 'P3', 0],
+      [4, 'P4 · none', 2],
     ]);
+    expect(cols[3].items).toEqual([plain, note]);
+    expect(groups[1].items).toEqual([plain]);
+    expect(columns('priority', []).map((g) => g.label)).toEqual(['P1', 'P2', 'P3', 'P4 · none']);
+  });
+
+  it('status: adds the empty open and done columns and keeps none last', () => {
     expect(columns('status', []).map((g) => g.key)).toEqual(['open', 'done']);
+    const none: Group = { key: null, label: 'none', items: [note] };
+    expect(columns('status', [none]).map((g) => g.label)).toEqual(['open', 'done', 'none']);
   });
 
   it('keeps the server groups as they are for other groupings', () => {

@@ -28,7 +28,7 @@ test('keyboard only: Shift+ArrowLeft moves a card from P3 to P2', async ({ page 
   const view = await api.view(`board ${tag}`, `type:task tag:${tag}`, 'priority');
 
   await page.goto(`/#/v/${view.id}`);
-  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['P1 1', 'P2 0', 'P3 1', 'P4 0']);
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['P1 1', 'P2 0', 'P3 1', 'P4 · none 0']);
   await tabTo(page, `p3 move me ${tag}`);
   await page.keyboard.press('Shift+ArrowLeft');
   const moved = page.getByRole('list', { name: 'P2' }).getByRole('link', { name: `p2 move me ${tag}` });
@@ -37,11 +37,30 @@ test('keyboard only: Shift+ArrowLeft moves a card from P3 to P2', async ({ page 
 
   await page.reload();
   await expect(page.getByRole('list', { name: 'P2' }).getByRole('link', { name: `p2 move me ${tag}` })).toBeVisible();
-  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['P1 1', 'P2 1', 'P3 0', 'P4 0']);
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['P1 1', 'P2 1', 'P3 0', 'P4 · none 0']);
   // Enter opens the focused card.
   await tabTo(page, `p2 move me ${tag}`);
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(new RegExp(`#/o/${card.id}$`));
+});
+
+test('keyboard only: Shift+ArrowRight moves a card to P4 · none, and it stays there after a reload', async ({ page }) => {
+  const api = rest(page.request);
+  const tag = `k${uid()}`;
+  const card = await api.task(`unrank ${tag}`, { priority: 3 }, [tag]);
+  const view = await api.view(`none ${tag}`, `type:task tag:${tag}`, 'priority');
+
+  await page.goto(`/#/v/${view.id}`);
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['P1 0', 'P2 0', 'P3 1', 'P4 · none 0']);
+  await tabTo(page, `p3 unrank ${tag}`);
+  await page.keyboard.press('Shift+ArrowRight');
+  const none = page.getByRole('list', { name: 'P4 · none' });
+  await expect(none.getByRole('link', { name: `unrank ${tag}`, exact: true })).toBeFocused();
+  await expect.poll(async () => (await api.get(card.id)).task.priority).toBe(4);
+
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['P1 0', 'P2 0', 'P3 0', 'P4 · none 1']);
+  await expect(none.getByRole('link', { name: `unrank ${tag}`, exact: true })).toBeVisible();
 });
 
 test('dragging a card to the done column completes the task', async ({ page }) => {
@@ -71,7 +90,7 @@ test('phone fit: the board scrolls inside its box', async ({ page }) => {
   const view = await api.view(`phone ${tag}`, `type:task tag:${tag}`, 'priority');
 
   await page.goto(`/#/v/${view.id}`);
-  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['P1 1', 'P2 0', 'P3 1', 'P4 0']);
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['P1 1', 'P2 0', 'P3 1', 'P4 · none 0']);
   await expectPhoneFit(page);
   const sizes = await page.locator('.card').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
   expect(sizes.length).toBe(2);
