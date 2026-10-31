@@ -6,6 +6,7 @@
   import { LISTS } from '../lib/tasks';
   import { listHref, trashHref } from '../objects/route';
   import { areaHref, projectHref, taskListHref } from './route';
+  import { viewsHref } from '../views/route';
 
   let projects = $state<Project[]>([]);
   let areas = $state<Obj[]>([]);
@@ -20,6 +21,7 @@
     ...LISTS.map((l) => ({ href: taskListHref(l), label: l })),
     { href: listHref, label: 'objects' },
     { href: trashHref, label: 'trash' },
+    { href: viewsHref, label: 'views' },
   ];
   const links = $derived([
     ...fixed,

@@ -44,6 +44,14 @@ describe('send', () => {
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(404);
     expect((err as ApiError).message).toBe('object not found');
+    expect((err as ApiError).at).toBeUndefined();
+  });
+
+  it('carries the error offset `at` when the server gives one', async () => {
+    stubFetch(() => Response.json({ error: 'query: expected a value', at: 7 }, { status: 400 }));
+    const err = await send('POST', '/api/views', {}).catch((e: unknown) => e);
+    expect((err as ApiError).message).toBe('query: expected a value');
+    expect((err as ApiError).at).toBe(7);
   });
 
   it('falls back to path and status when the error body is not JSON', async () => {
