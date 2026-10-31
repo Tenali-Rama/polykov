@@ -2,7 +2,7 @@
 id: 046
 title: Add the web Kanban layout with keyboard and drag moves
 milestone: M3
-status: todo
+status: done
 deps: [045]
 touches: [web/src/views/Kanban.svelte, web/src/views/Kanban.test.ts, web/src/views/move.ts, web/src/views/move.test.ts, web/src/views/ViewPage.svelte+, web/e2e/kanban.spec.ts, web/API.md]
 spec: ["Tasks (GTD)", "Organization", "7. Clients & UI"]
@@ -33,4 +33,8 @@ A view with `layout: kanban` shows one column per group. Moving a task card to a
 - Manual card order within a column (spec has no manual order; sort comes from the view). Swipe gestures (M14).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `status` and `priority` boards always show every column (`open`/`done`, `P1`–`P4`), even empty ones, so a card can move there; the server lists only non-empty groups. Other groupings show only the server's groups.
+- Moving to priority `none` sets 4 (the server's "no priority"; `priority` can't be `null`). A move to status `none` has no call.
+- A section move only sets `section_id`; a section of another project fails with the server's `section is not in this project` and the card goes back.
+- A move doesn't reload: the server's task replaces the card in its new column, so a card that no longer matches the query stays until the next reload.
+- Mouse drag doesn't start from touch input, so the phone e2e drag is `test.fixme` until M14 swipe actions; phone users move cards by keyboard only for now.
