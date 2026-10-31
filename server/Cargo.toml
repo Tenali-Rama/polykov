@@ -30,4 +30,5 @@ polykov-parse = { path = "../parse" }
 
 [dev-dependencies]
 http-body-util = "0.1"
+libc = "0.2"
 tower = { version = "0.5", features = ["util"] }

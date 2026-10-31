@@ -2,7 +2,7 @@
 id: 055
 title: Make the search latency test robust to a loaded VM without loosening the budget
 milestone: M4
-status: todo
+status: done
 deps: []
 touches: [server/tests/search_perf.rs, server/Cargo.toml, Cargo.lock]
 spec: ["10. Non-Functional", "Organization"]
@@ -23,4 +23,6 @@ spec: ["10. Non-Functional", "Organization"]
 - Changing the search code or ADR 0014.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- The test uses process CPU time (`CLOCK_PROCESS_CPUTIME_ID`), not thread CPU time. Handlers run their store calls via `http::blocking` (`spawn_blocking`), so a per-thread clock on the requesting thread misses most of the work, even on a current-thread runtime.
+- The process clock is accurate only while nothing else runs in the process during a request. Keep `search_perf.rs` to one test on the default single-threaded `#[tokio::test]` runtime.
+- The wall-clock fallback (3 full runs, pass if any one is under budget) applies only when `clock_gettime` fails.
