@@ -3,6 +3,7 @@
   import { ApiError } from '../lib/api';
   import { getObject } from '../lib/objects';
   import { updateView, type View } from '../lib/views';
+  import { viewSource } from './source';
   import { OBJECTS_CHANGED } from '../favourites/Favourites.svelte';
   import ListLayout from './ListLayout.svelte';
   import Eisenhower from './Eisenhower.svelte';
@@ -72,13 +73,13 @@
     {#key revision}
       <!-- One branch per layout (046 kanban, 047 eisenhower); the rest fall back to the list. -->
       {#if view.properties.layout === 'list'}
-        <ListLayout {id} />
+        <ListLayout source={viewSource(view)} />
       {:else if view.properties.layout === 'eisenhower'}
-        <Eisenhower {id} />
+        <Eisenhower source={viewSource(view)} />
       {:else if view.properties.layout === 'kanban'}
-        <Kanban {id} />
+        <Kanban source={viewSource(view)} />
       {:else}
-        <ListLayout {id} />
+        <ListLayout source={viewSource(view)} />
       {/if}
     {/key}
   {/if}

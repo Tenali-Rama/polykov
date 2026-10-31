@@ -5,6 +5,7 @@ import { makeRow } from '../tasks/testing';
 import type { Group, View } from '../lib/views';
 import Kanban from './Kanban.svelte';
 import ViewPage from './ViewPage.svelte';
+import { viewSource } from './source';
 
 const view = (group: View['properties']['group']): View => ({
   ...makeObj(4, { type: 'view', title: 'Board' }),
@@ -41,7 +42,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('Kanban', () => {
   it('shows a box per column in order, with label, count and cards', async () => {
     api('priority', PRIORITY);
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('priority')) });
     await screen.findByRole('list', { name: 'P1' });
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
       'P1 1',
@@ -66,7 +67,7 @@ describe('Kanban', () => {
 
   it('arrows move focus between cards and columns, skipping empty ones', async () => {
     api('priority', PRIORITY);
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('priority')) });
     const one = await screen.findByRole('link', { name: /task 1/ });
     one.focus();
     await fireEvent.keyDown(one, { key: 'ArrowRight' });
@@ -85,7 +86,7 @@ describe('Kanban', () => {
     const fetch = api('priority', PRIORITY, {
       'PATCH /api/tasks/2': () => Response.json(task(2, { priority: 2 })),
     });
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('priority')) });
     const two = await screen.findByRole('link', { name: /task 2/ });
     two.focus();
     await fireEvent.keyDown(two, { key: 'ArrowLeft', shiftKey: true });
@@ -99,7 +100,7 @@ describe('Kanban', () => {
     const fetch = api('none', [{ key: 'open', label: 'open', items: [task(1)] }], {
       'POST /api/tasks/1/complete': () => Response.json({ task: task(1, { status: 'done' }), next: null }),
     });
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('none')) });
     const one = await screen.findByRole('link', { name: /task 1/ });
     one.focus();
     await fireEvent.keyDown(one, { key: 'ArrowRight', shiftKey: true });
@@ -125,7 +126,7 @@ describe('Kanban', () => {
       },
       'POST /api/tasks/1/complete': () => Response.json({ task: task(1, { status: 'done' }), next: task(8) }),
     });
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('status')) });
     const one = await screen.findByRole('link', { name: /task 1/ });
     one.focus();
     await fireEvent.keyDown(one, { key: 'ArrowRight', shiftKey: true });
@@ -138,7 +139,7 @@ describe('Kanban', () => {
     const fetch = api('none', [{ key: 'open', label: 'open', items: [task(1)] }], {
       'POST /api/tasks/1/complete': () => Response.json({ task: task(1, { status: 'done' }), next: null }),
     });
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('none')) });
     const one = await screen.findByRole('link', { name: /task 1/ });
     one.focus();
     await fireEvent.keyDown(one, { key: 'ArrowRight', shiftKey: true });
@@ -151,7 +152,7 @@ describe('Kanban', () => {
       { key: 'home', label: 'home', items: [task(1), task(2)] },
       { key: 'work', label: 'work', items: [task(3), task(1), task(4)] },
     ]);
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('tag')) });
     await screen.findByRole('list', { name: 'work' });
     const inWork = column('work').getByRole('link', { name: /task 1/ });
     inWork.focus();
@@ -167,7 +168,7 @@ describe('Kanban', () => {
     api('priority', PRIORITY, {
       'PATCH /api/tasks/1': () => Response.json({ error: 'priority must be 1 to 4' }, { status: 400 }),
     });
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('priority')) });
     const one = await screen.findByRole('link', { name: /task 1/ });
     await fireEvent.dragStart(one);
     await fireEvent.dragOver(screen.getByRole('region', { name: P4 }));
@@ -182,7 +183,7 @@ describe('Kanban', () => {
       { key: 'home', label: 'home', items: [task(1)] },
       { key: 'work', label: 'work', items: [task(2)] },
     ]);
-    render(Kanban, { id: 4 });
+    render(Kanban, { source: viewSource(view('tag')) });
     expect(await screen.findByText('read-only grouping')).toBeInTheDocument();
     const one = card(/task 1/);
     expect(one).toHaveAttribute('draggable', 'false');
