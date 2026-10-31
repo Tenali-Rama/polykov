@@ -3,7 +3,7 @@
   // the commands and, when not empty, runs a global search (each keystroke aborts the previous one).
   import { tick } from 'svelte';
   import { hitHref, isDone, pieces, search, type Hit } from '../lib/search';
-  import { filterCommands, PALETTE_OPEN, type Command } from './commands';
+  import { announceOverlay, filterCommands, OVERLAY_OPEN, PALETTE_OPEN, type Command } from './commands';
 
   /** How many search results the palette shows. */
   const LIMIT = 10;
@@ -34,16 +34,23 @@
       }
     };
     const onopen = (e: Event) => void show((e as CustomEvent<{ text?: string }>).detail?.text ?? '');
+    const onother = (e: Event) => {
+      if (open && (e as CustomEvent<{ name: string }>).detail.name !== 'palette') giveWay();
+    };
     window.addEventListener('keydown', onkey, true);
     window.addEventListener(PALETTE_OPEN, onopen);
+    window.addEventListener(OVERLAY_OPEN, onother);
     return () => {
       window.removeEventListener('keydown', onkey, true);
       window.removeEventListener(PALETTE_OPEN, onopen);
+      window.removeEventListener(OVERLAY_OPEN, onother);
     };
   });
 
   async function show(initial: string) {
     if (!open) {
+      // First, so the other overlay hands focus back and that is what this one returns to.
+      announceOverlay('palette');
       returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       open = true;
     }
@@ -66,6 +73,13 @@
     await tick();
     returnTo?.focus();
     returnTo = null;
+  }
+
+  /** Another overlay is opening: focus goes back at once (it records it), then this one closes. */
+  function giveWay() {
+    returnTo?.focus();
+    returnTo = null;
+    void close();
   }
 
   async function query() {

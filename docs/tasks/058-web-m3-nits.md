@@ -2,7 +2,7 @@
 id: 058
 title: Fix TaskRow priority wrapping, palette/capture overlay clash and the event-name copy
 milestone: M4
-status: todo
+status: done
 deps: []
 touches: [web/src/tasks/TaskRow.svelte, web/src/palette/Palette.svelte, web/src/palette/Palette.test.ts, web/src/palette/commands.ts, web/src/palette/commands.test.ts, web/src/capture/CaptureBar.svelte, web/src/capture/CaptureBar.test.ts, web/src/objects/Detail.svelte, web/e2e/palette.spec.ts, web/API.md]
 spec: ["7. Clients & UI", "Capture", "Organization"]
@@ -21,4 +21,6 @@ Small M3 web review findings: the priority badge never breaks across lines, only
 - New palette commands. The layout loader refactor (task 059).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- Overlays coordinate through `OVERLAY_OPEN` / `announceOverlay(name)` in `palette/commands.ts`. A new overlay calls `announceOverlay` before it records its focus-return element and listens for the event to give way (focus back synchronously, then close).
+- Giving way restores focus synchronously so the opening overlay records the original element. Esc in the second overlay therefore returns to where the first was opened from.
+- The badge only wrapped in Eisenhower quadrants (inherited `overflow-wrap: anywhere` with `min-width: auto`). At 360 px it measured 7.5x42 px before the fix and 15x21 px after.

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CAPTURE_OPEN, COMMANDS, filterCommands, subsequence } from './commands';
+import { announceOverlay, CAPTURE_OPEN, COMMANDS, filterCommands, OVERLAY_OPEN, subsequence } from './commands';
 
 const labels = (query: string) => filterCommands(query).map((c) => c.label);
 
@@ -40,6 +40,14 @@ describe('commands', () => {
     COMMANDS.find((c) => c.label === 'new task')!.run();
     expect(opened).toHaveBeenCalledTimes(1);
     window.removeEventListener(CAPTURE_OPEN, opened);
+  });
+
+  it('announceOverlay dispatches overlay-open with the opening overlay', () => {
+    const seen = vi.fn((e: Event) => (e as CustomEvent).detail);
+    window.addEventListener(OVERLAY_OPEN, seen);
+    announceOverlay('capture');
+    expect(seen.mock.results.map((r) => r.value)).toEqual([{ name: 'capture' }]);
+    window.removeEventListener(OVERLAY_OPEN, seen);
   });
 });
 

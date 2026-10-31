@@ -8,6 +8,15 @@ import { viewsHref } from '../views/route';
 export const PALETTE_OPEN = 'polykov:palette-open';
 /** Opens the capture bar. */
 export const CAPTURE_OPEN = 'polykov:capture-open';
+/** Dispatched by an overlay as it opens (`detail: { name }`), so any other open overlay gives way. */
+export const OVERLAY_OPEN = 'polykov:overlay-open';
+
+export type Overlay = 'palette' | 'capture';
+
+/** Tells the other overlays that `name` is opening; they close and put focus back first. */
+export function announceOverlay(name: Overlay) {
+  window.dispatchEvent(new CustomEvent(OVERLAY_OPEN, { detail: { name } }));
+}
 
 export type Command = { label: string; run: () => void };
 

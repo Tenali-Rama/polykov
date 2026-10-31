@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import CaptureBar from './CaptureBar.svelte';
+import Palette from '../palette/Palette.svelte';
 import type { Parsed, Token } from '../lib/smartadd';
 import { CAPTURE_OPEN, PALETTE_OPEN } from '../palette/commands';
 
@@ -266,5 +267,21 @@ describe('capture bar', () => {
     window.dispatchEvent(new CustomEvent(CAPTURE_OPEN));
     const input = await screen.findByRole('textbox', { name: 'capture' });
     await waitFor(() => expect(input).toHaveFocus());
+  });
+
+  it('Ctrl+Space while the palette is open closes the palette first; Esc returns where it was opened', async () => {
+    stub();
+    const other = setup();
+    render(Palette);
+    const palette = () => screen.queryByRole('dialog', { name: 'palette' });
+    await fireEvent.keyDown(other, { key: 'k', code: 'KeyK', ctrlKey: true });
+    const combo = await screen.findByRole('combobox', { name: 'palette' });
+    await waitFor(() => expect(combo).toHaveFocus());
+    const input = await openBar(combo);
+    expect(palette()).toBeNull();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await fireEvent.keyDown(input, { key: 'Escape' });
+    await waitFor(() => expect(dialog()).toBeNull());
+    expect(other).toHaveFocus();
   });
 });
