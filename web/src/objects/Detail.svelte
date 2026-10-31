@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { OBJECTS_CHANGED } from '../favourites/Favourites.svelte';
   import { ApiError } from '../lib/api';
   import { deleteObject, getObject, updateObject, type Obj, type Patch } from '../lib/objects';
   import Attachments from './Attachments.svelte';
@@ -38,7 +39,7 @@
   /** One `PATCH`; the server's object (normalized tags, new `updated`) replaces ours. Throws `ApiError`. */
   async function save(patch: Patch) {
     obj = await updateObject(id, patch);
-    if (patch.pinned !== undefined) window.dispatchEvent(new Event('polykov:objects-changed'));
+    if (patch.pinned !== undefined) window.dispatchEvent(new Event(OBJECTS_CHANGED));
   }
 
   function editTitle(current: string) {

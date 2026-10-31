@@ -4,7 +4,7 @@
   // typed into the empty line hands over to the command palette.
   import { tick } from 'svelte';
   import { add, landing, localToday, parse, type Parsed, type Token } from '../lib/smartadd';
-  import { CAPTURE_OPEN, PALETTE_OPEN } from '../palette/commands';
+  import { announceOverlay, CAPTURE_OPEN, OVERLAY_OPEN, PALETTE_OPEN } from '../palette/commands';
   import { chips, quote, segments } from './highlight';
 
   const NOTE_MS = 4000;
@@ -39,16 +39,23 @@
       }
     };
     const onopen = () => void show();
+    const onother = (e: Event) => {
+      if (open && (e as CustomEvent<{ name: string }>).detail.name !== 'capture') giveWay();
+    };
     window.addEventListener('keydown', onkey, true);
     window.addEventListener(CAPTURE_OPEN, onopen);
+    window.addEventListener(OVERLAY_OPEN, onother);
     return () => {
       window.removeEventListener('keydown', onkey, true);
       window.removeEventListener(CAPTURE_OPEN, onopen);
+      window.removeEventListener(OVERLAY_OPEN, onother);
     };
   });
 
   async function show() {
     if (!open) {
+      // First, so the other overlay hands focus back and that is what this one returns to.
+      announceOverlay('capture');
       returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       today = localToday();
       open = true;
@@ -74,17 +81,21 @@
   function oninput() {
     const was = before;
     before = text;
-    if (was === '' && text.startsWith('>')) void toPalette(text.slice(1));
+    if (was === '' && text.startsWith('>')) toPalette(text.slice(1));
     else void reparse();
   }
 
   /** Closes the bar and opens the palette with `rest`; the palette's Esc returns to where the bar was opened from. */
-  async function toPalette(rest: string) {
-    const back = returnTo;
-    returnTo = null;
-    back?.focus();
+  function toPalette(rest: string) {
+    giveWay();
     window.dispatchEvent(new CustomEvent(PALETTE_OPEN, { detail: { text: rest } }));
-    await close();
+  }
+
+  /** Another overlay is opening: focus goes back at once (it records it), then the bar closes. */
+  function giveWay() {
+    returnTo?.focus();
+    returnTo = null;
+    void close();
   }
 
   async function reparse() {

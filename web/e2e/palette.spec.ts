@@ -63,6 +63,27 @@ test('keyboard: Ctrl+Space, >, today, Enter lands on #/today; Esc restores focus
   await expect(command).toBeFocused();
 });
 
+test('keyboard: Ctrl+K and Ctrl+Space swap the overlays, never showing two dialogs', async ({ page }) => {
+  await page.goto('/');
+  await expectShell(page);
+  const command = page.getByRole('textbox', { name: 'command' });
+  const capture = page.getByRole('textbox', { name: 'capture' });
+  const dialogs = page.getByRole('dialog');
+  await command.focus();
+  await page.keyboard.press('Control+Space');
+  await expect(capture).toBeFocused();
+  await page.keyboard.press('Control+k');
+  await expect(input(page)).toBeFocused();
+  await expect(dialogs).toHaveCount(1);
+  await page.keyboard.press('Control+Space');
+  await expect(capture).toBeFocused();
+  await expect(dialogs).toHaveCount(1);
+  await expect(palette(page)).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(dialogs).toHaveCount(0);
+  await expect(command).toBeFocused();
+});
+
 test('phone: ten results fit and every row is at least 44 px tall', async ({ page }, info) => {
   test.skip(info.project.name !== 'phone', 'phone only');
   const word = `zebrafish${uid()}`;

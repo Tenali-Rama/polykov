@@ -126,7 +126,10 @@
     color: var(--dim);
     text-decoration: line-through;
   }
+  /* The badge never breaks or shrinks, however long the title. */
   .prio {
+    flex-shrink: 0;
+    white-space: nowrap;
     color: var(--accent);
   }
   .meta {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import Palette from './Palette.svelte';
+import CaptureBar from '../capture/CaptureBar.svelte';
 import { CAPTURE_OPEN, COMMANDS, PALETTE_OPEN } from './commands';
 import type { Hit } from '../lib/search';
 import { makeObj } from '../objects/testing';
@@ -198,5 +199,37 @@ describe('command palette', () => {
     expect(input.value).toBe('upc');
     expect(options().map((o) => o.textContent?.trim())).toEqual(['go to upcoming']);
     expect(calls.map((c) => c.url)).toEqual(['/api/search?q=upc&limit=10']);
+  });
+
+  it('Ctrl+K while the capture bar is open closes the bar first; Esc returns where the bar was opened', async () => {
+    stub();
+    const other = setup();
+    render(CaptureBar);
+    const capture = () => screen.queryByRole('dialog', { name: 'capture' });
+    await fireEvent.keyDown(other, { key: ' ', code: 'Space', ctrlKey: true });
+    const bar = await screen.findByRole('textbox', { name: 'capture' });
+    await waitFor(() => expect(bar).toHaveFocus());
+    const input = await openPalette(bar);
+    expect(capture()).toBeNull();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await fireEvent.keyDown(input, { key: 'Escape' });
+    await waitFor(() => expect(dialog()).toBeNull());
+    expect(other).toHaveFocus();
+  });
+
+  it('> in the capture bar still hands its text to the palette, leaving one dialog', async () => {
+    stub();
+    const other = setup();
+    render(CaptureBar);
+    await fireEvent.keyDown(other, { key: ' ', code: 'Space', ctrlKey: true });
+    const bar = await screen.findByRole('textbox', { name: 'capture' });
+    await fireEvent.input(bar, { target: { value: '>upc' } });
+    const input = (await screen.findByRole('combobox', { name: 'palette' })) as HTMLInputElement;
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(input.value).toBe('upc');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await fireEvent.keyDown(input, { key: 'Escape' });
+    await waitFor(() => expect(dialog()).toBeNull());
+    expect(other).toHaveFocus();
   });
 });
