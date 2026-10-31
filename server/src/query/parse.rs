@@ -244,6 +244,9 @@ fn tag((at, value, _): (usize, String, bool)) -> Result<TagPattern, ParseError> 
         Some(parent) => (parent, true),
         None => (value.as_str(), false),
     };
+    if let Some(star) = tag.chars().position(|c| c == '*') {
+        return Err(err(at + star, "tag wildcard must be a single trailing /*"));
+    }
     let tag = crate::tags::normalize(tag).map_err(|_| err(at, format!("invalid tag {value}")))?;
     Ok(TagPattern { tag, subtree })
 }
@@ -291,7 +294,7 @@ fn date(item: &Item, name: &str) -> Result<Cmp<DateValue>, ParseError> {
             return Err(err(item.at, format!("{name}:none takes no operator")));
         }
         "none" => DateValue::None,
-        _ if value.contains('-') && value.len() == 10 => {
+        _ if is_date_shaped(&value) => {
             DateValue::Absolute(NaiveDate::parse_from_str(&value, "%Y-%m-%d").map_err(|_| bad())?)
         }
         _ => {
@@ -313,4 +316,14 @@ fn date(item: &Item, name: &str) -> Result<Cmp<DateValue>, ParseError> {
         op: op.unwrap_or(Op::Eq),
         value: parsed,
     })
+}
+
+/// Whether `value` has the `YYYY-MM-DD` shape (digits with `-` at 4 and 7), so that a signed
+/// relative offset of the same length, such as `-12345678d`, is not read as a date.
+fn is_date_shaped(value: &str) -> bool {
+    value.len() == 10
+        && value.bytes().enumerate().all(|(i, b)| match i {
+            4 | 7 => b == b'-',
+            _ => b.is_ascii_digit(),
+        })
 }

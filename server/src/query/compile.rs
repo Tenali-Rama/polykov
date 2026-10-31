@@ -261,8 +261,9 @@ pub fn run(
     })
 }
 
-/// The SQL values of `params`, each text term resolved to its matching ids.
-fn bind(conn: &Connection, params: &[Param]) -> Result<Vec<Value>, db::Error> {
+/// The SQL values of `params`, each text term bound as the JSON array of the ids that
+/// `search::matching_ids` finds for it. `run` and `views` both bind through this.
+pub(crate) fn bind(conn: &Connection, params: &[Param]) -> Result<Vec<Value>, db::Error> {
     params
         .iter()
         .map(|p| match p {

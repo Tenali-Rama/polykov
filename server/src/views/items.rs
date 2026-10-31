@@ -29,8 +29,8 @@ use crate::{
 pub const MAX_ITEMS: usize = 500;
 /// Eisenhower: a task is important at this priority or higher (lower number).
 pub const IMPORTANT_PRIORITY: i64 = 2;
-/// Eisenhower: a task is urgent when overdue or its deadline or scheduled date is at most
-/// this many days after today (owner may change).
+/// Eisenhower: an open task is urgent when overdue or its deadline or scheduled date is at
+/// most this many days after today (owner may change). A done task is never urgent.
 pub const URGENT_DAYS: u64 = 2;
 
 /// Query string of the items route.
@@ -156,7 +156,8 @@ fn eisenhower(db: &Db, keys: &[Key], today: NaiveDate) -> Result<Vec<Bucket>, Ap
             .into_iter()
             .filter_map(|d| keys::date(d.as_deref()))
             .min();
-        let urgent = soonest.is_some_and(|d| horizon.is_none_or(|h| d <= h));
+        let open = k.status.as_deref() == Some("open");
+        let urgent = open && soonest.is_some_and(|d| horizon.is_none_or(|h| d <= h));
         let quadrant = match (urgent, important) {
             (true, true) => 0,
             (false, true) => 1,

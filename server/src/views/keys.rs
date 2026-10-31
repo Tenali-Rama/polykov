@@ -4,14 +4,14 @@
 use std::cmp::Ordering;
 
 use chrono::NaiveDate;
-use rusqlite::{Connection, params_from_iter, types::Value};
+use rusqlite::params_from_iter;
 
 use super::spec::Sort;
 use crate::{
     db::{self, Db},
     http::ApiError,
-    query::{self, FROM, Param, Query},
-    search, smartsort,
+    query::{self, FROM, Query},
+    smartsort,
     tasks::store::Fields,
 };
 
@@ -53,7 +53,7 @@ const JOINS: &str = "LEFT JOIN objects vp ON vp.id = t.project_id AND vp.type = 
 pub fn select(db: &Db, query: &Query, today: NaiveDate) -> Result<Vec<Key>, ApiError> {
     let compiled = query::compile(query, today)?;
     let conn = db.conn()?;
-    let args = bind(&conn, &compiled.params)?;
+    let args = query::bind(&conn, &compiled.params)?;
     let sql = format!(
         "SELECT objects.id, objects.type, objects.title, objects.created, objects.updated, \
          t.completed, \
@@ -93,21 +93,6 @@ pub fn select(db: &Db, query: &Query, today: NaiveDate) -> Result<Vec<Key>, ApiE
         .collect::<Result<Vec<_>, _>>()
         .map_err(db::Error::Sqlite)?;
     Ok(keys)
-}
-
-/// The SQL values of `params`, each text term bound as the JSON array of its matching ids,
-/// as `query::run` binds them.
-fn bind(conn: &Connection, params: &[Param]) -> Result<Vec<Value>, db::Error> {
-    params
-        .iter()
-        .map(|p| match p {
-            Param::Value(v) => Ok(v.clone()),
-            Param::Search(text) => {
-                let ids = search::matching_ids(conn, text)?;
-                Ok(Value::Text(serde_json::Value::from(ids).to_string()))
-            }
-        })
-        .collect()
 }
 
 /// Sorts `keys` by `sort` (ADR 0016): `smart` by smart score, highest first; `created`,

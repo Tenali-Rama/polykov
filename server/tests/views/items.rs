@@ -188,6 +188,33 @@ async fn eisenhower_quadrants_at_the_boundaries() {
 }
 
 #[tokio::test]
+async fn eisenhower_done_tasks_are_never_urgent() {
+    let c = Ctx::new("views-eisenhower-done").await;
+    let t = |p: i64, field: &str| {
+        c.task(
+            json!({"title": format!("{p} {field}"), "task": {"priority": p, field: "2026-10-31"}}),
+        )
+    };
+    let open = t(1, "deadline").await;
+    let done_important = t(1, "deadline").await;
+    let done_neither = t(3, "scheduled").await;
+    for id in [done_important, done_neither] {
+        c.call(Method::POST, &format!("/api/tasks/{id}/complete"), None)
+            .await;
+    }
+    let groups = c.groups("type:task", "eisenhower", "none", "created").await;
+    assert_eq!(
+        groups,
+        [
+            json!(["urgent_important", "urgent & important", [open]]),
+            json!(["important", "important", [done_important]]),
+            json!(["urgent", "urgent", []]),
+            json!(["neither", "neither", [done_neither]]),
+        ]
+    );
+}
+
+#[tokio::test]
 async fn truncates_at_500() {
     let c = Ctx::new("views-truncate").await;
     c.sql(
