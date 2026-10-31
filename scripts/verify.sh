@@ -30,8 +30,18 @@ if [ -f Cargo.toml ]; then
   step test cargo test --workspace --quiet
 fi
 
+# web/node_modules is reinstalled when missing or when package-lock.json changed since the
+# last install here: its sha256 is stamped into node_modules after a successful `npm ci`.
+WEB_LOCK_STAMP=web/node_modules/.verify-lock-sha256
+web_lock_hash() { sha256sum web/package-lock.json | cut -d' ' -f1; }
+web_install() {
+  npm --prefix web ci --no-audit --no-fund && web_lock_hash >"$WEB_LOCK_STAMP"
+}
+
 if [ -f web/package.json ]; then
-  [ -d web/node_modules ] || step web-install npm --prefix web ci --no-audit --no-fund
+  if [ ! -d web/node_modules ] || [ "$(cat "$WEB_LOCK_STAMP" 2>/dev/null)" != "$(web_lock_hash)" ]; then
+    step web-install web_install
+  fi
   for s in lint check test build; do
     if jq -e ".scripts.\"$s\"" web/package.json >/dev/null; then
       step "web-$s" npm --prefix web run --silent "$s"

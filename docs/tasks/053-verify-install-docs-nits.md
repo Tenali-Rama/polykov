@@ -2,7 +2,7 @@
 id: 053
 title: Reinstall stale web deps in verify and fix M2 docs nits
 milestone: M3
-status: todo
+status: done
 deps: []
 touches: [scripts/verify.sh, web/CLAUDE.md, docs/factory/QUALITY.md, server/CLAUDE.md, docs/decisions/0001-workspace-layout.md]
 spec: ["2. Architecture & Stack"]
@@ -27,4 +27,6 @@ M2 review backlog. `scripts/verify.sh` reinstalls web deps when `web/node_module
 - Other verify steps. Rewording docs beyond these nits.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `verify.sh` stamps the sha256 of `web/package-lock.json` into `web/node_modules/.verify-lock-sha256` after a successful `npm ci`; a missing or different stamp triggers `web-install`.
+- A checkout with `node_modules` installed before this change has no stamp, so its first verify reinstalls once.
+- Chose the stored hash over diffing `node_modules/.package-lock.json`: npm's hidden lockfile has a different shape (no root entry), so a direct compare would always differ.

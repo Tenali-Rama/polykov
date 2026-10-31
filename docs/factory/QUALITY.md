@@ -28,7 +28,7 @@ Builders meet this before opening a PR. Reviewers check every point. A PR merges
     - Minimal, CLI-look style (spec §7–8).
     - Every action can be done by keyboard.
     - Works at phone width.
-    - Touch targets ≥ 44px on Android.
+    - Touch targets ≥ 44px at phone width on every client (web included), not only Android.
 11. **ML**: there is an experiment log in `docs/models/` that compares against a baseline (spec §5).
 12. **Git**: one task per PR. The owner is the author. No AI attribution.
 
