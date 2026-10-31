@@ -10,8 +10,9 @@ mod routes;
 
 use std::fmt;
 
-use chrono::{Days, Months, NaiveDate};
+use chrono::{Datelike, Days, Months, NaiveDate};
 
+pub(crate) use compile::bind;
 pub use compile::{Compiled, FROM, Item, Page, Param, compile, run};
 pub use parse::parse;
 pub use routes::{DEFAULT_LIMIT, MAX_LIMIT, MAX_QUERY_CHARS, routes};
@@ -135,8 +136,14 @@ impl std::error::Error for ParseError {}
 
 impl DateValue {
     /// The date this value means when the local date is `today`; `None` for [`DateValue::None`]
-    /// or when the offset leaves chrono's range. A month offset past the month's end clamps.
+    /// or when the date leaves the years 0000 to 9999, where `YYYY-MM-DD` text compares as
+    /// dates do. A month offset past the month's end clamps.
     pub fn resolve(self, today: NaiveDate) -> Option<NaiveDate> {
+        self.resolve_any(today)
+            .filter(|date| (0..=9999).contains(&date.year()))
+    }
+
+    fn resolve_any(self, today: NaiveDate) -> Option<NaiveDate> {
         match self {
             DateValue::None => None,
             DateValue::Absolute(date) => Some(date),

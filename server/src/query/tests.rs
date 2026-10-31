@@ -176,6 +176,42 @@ fn relative_dates_resolve_against_a_given_today() {
     }
     assert_eq!(DateValue::None.resolve(today), None);
     assert_eq!(rel(i32::MAX, Unit::Week).resolve(today), None);
+    assert_eq!(
+        rel(-12345678, Unit::Day).resolve(today),
+        None,
+        "before year 0000"
+    );
+    assert_eq!(
+        rel(3000000, Unit::Day).resolve(today),
+        None,
+        "after year 9999"
+    );
+    let month = |n| rel(n, Unit::Month).resolve(today);
+    assert_eq!(month(-2026 * 12), Some(d("0000-01-31")));
+    assert_eq!(month(-2026 * 12 - 1), None);
+    assert_eq!(month(7973 * 12 + 11), Some(d("9999-12-31")));
+    assert_eq!(month(7974 * 12), None);
+}
+
+#[test]
+fn a_ten_char_signed_offset_is_relative_not_a_date() {
+    assert_eq!(
+        one("due:-12345678d").filter,
+        Filter::Date(DateField::Due, vec![cmp(Op::Eq, rel(-12345678, Unit::Day))])
+    );
+    assert_eq!(
+        one("due:2026-10-31").filter,
+        Filter::Date(
+            DateField::Due,
+            vec![cmp(Op::Eq, DateValue::Absolute(d("2026-10-31")))]
+        )
+    );
+    let err = compile(&parse("due:-12345678d").unwrap(), d("2026-10-31")).unwrap_err();
+    assert!(
+        matches!(&err, crate::http::ApiError::Client(status, message)
+            if status.as_u16() == 400 && message == "date is out of range"),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -285,6 +321,14 @@ fn errors_name_the_offset() {
         ("x - y", 3, "empty term"),
         ("type:tsk", 5, "unknown type tsk"),
         ("tag:a/", 4, "invalid tag a/"),
+        (
+            "tag:work/*/*",
+            9,
+            "tag wildcard must be a single trailing /*",
+        ),
+        ("tag:*", 4, "tag wildcard must be a single trailing /*"),
+        ("tag:wo*rk", 6, "tag wildcard must be a single trailing /*"),
+        ("tag:a,b*/*", 7, "tag wildcard must be a single trailing /*"),
         ("project:inbox", 8, "project takes an id"),
         ("pinned:yes", 7, "pinned must be true or false"),
         ("pinned:true,false", 12, "pinned takes one value"),

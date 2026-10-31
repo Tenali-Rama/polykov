@@ -2,7 +2,7 @@
 id: 054
 title: Fix Eisenhower urgency for done tasks, share query binding and tighten query dates and tags
 milestone: M4
-status: todo
+status: done
 deps: []
 touches: [server/src/views/items.rs, server/src/views/keys.rs, server/src/query/mod.rs, server/src/query/parse.rs, server/src/query/tests.rs, server/tests/views/items.rs, server/API.md, docs/decisions/0015-query-language.md, docs/decisions/0016-saved-views.md]
 spec: ["Organization", "Tasks (GTD)"]
@@ -24,4 +24,7 @@ Three M3 review findings on the server: done tasks no longer count as urgent, `v
 - Any new query field or layout. Web changes.
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- Eisenhower urgency now checks `Key.status == "open"`; done tasks fall to `important`/`neither` by priority.
+- `query::bind` (crate-internal, defined in `query/compile.rs`) is the single binder for `Param`s; `views::keys` calls it. Making it `pub(crate)` was a one-word edit to `compile.rs`, outside `touches`.
+- `DateValue::resolve` now returns `None` outside the years 0000–9999 (not just outside chrono's range), so `-12345678d` gets `400 date is out of range` as the criterion asks, and `YYYY-MM-DD` text comparison stays sound (chrono prints year 10000+ as `+10000-...`).
+- A query date is absolute only in the exact `DDDD-DD-DD` shape; `tag:` rejects any `*` except one trailing `/*`, at the offset of the first bad `*`.
