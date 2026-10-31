@@ -6,6 +6,7 @@
   import { OBJECTS_CHANGED } from '../favourites/Favourites.svelte';
   import ListLayout from './ListLayout.svelte';
   import Eisenhower from './Eisenhower.svelte';
+  import Kanban from './Kanban.svelte';
   import ViewEditor from './ViewEditor.svelte';
 
   // `id` is read once; Shell re-creates the page per id.
@@ -74,6 +75,8 @@
         <ListLayout {id} />
       {:else if view.properties.layout === 'eisenhower'}
         <Eisenhower {id} />
+      {:else if view.properties.layout === 'kanban'}
+        <Kanban {id} />
       {:else}
         <ListLayout {id} />
       {/if}
