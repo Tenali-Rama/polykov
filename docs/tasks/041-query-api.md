@@ -2,7 +2,7 @@
 id: 041
 title: Compile view queries to SQL and serve GET /api/query
 milestone: M3
-status: todo
+status: done
 deps: [039, 040]
 touches: [server/src/query/compile.rs, server/src/query/routes.rs, server/src/query/mod.rs, server/src/app.rs+, server/tests/query.rs, server/API.md]
 spec: ["Organization", "Tasks (GTD)", "3. Data Model"]
@@ -31,4 +31,8 @@ Any query in the 040 language runs against the database. `GET /api/query?q=` ret
 - Saved views, grouping and smart sort (042/043). CLI (M15).
 
 ## Notes for next
-<!-- builder fills in: ≤ 5 bullets that a later task needs to know -->
+- `query::compile` returns `Compiled { sql_where, params }` over `query::FROM`; a text term is `Param::Search`, which `query::run` turns into a JSON id array via `search::matching_ids`. 042/043 can reuse `compile` and add their own ORDER BY.
+- Defaults chosen: `status`/`priority`/`due`/`scheduled`/`completed`/`project` match tasks only (so `-status:done` keeps notes); `area:` also matches projects in the area; titles compare `COLLATE NOCASE`.
+- `created`/`updated`/`completed` are Unix seconds and compare by their UTC date (`date(.., 'unixepoch')`); a local-day view would need the client's zone.
+- A relative date beyond chrono's range is `400 date is out of range` (no `at`: the AST has no offsets). `q` is capped at 1000 chars.
+- Results are fetched one object at a time (`tasks::store::get` / `objects::store::get`), fine for `limit` ≤ 1000.

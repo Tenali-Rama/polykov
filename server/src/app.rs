@@ -29,6 +29,7 @@ pub fn router(db: Db, web_dir: &Path) -> Router {
         .merge(crate::lists::routes())
         .merge(crate::smartadd::routes())
         .merge(crate::search::routes())
+        .merge(crate::query::routes())
         .route("/api", any(not_found))
         .route("/api/", any(not_found))
         .route("/api/{*rest}", any(not_found))

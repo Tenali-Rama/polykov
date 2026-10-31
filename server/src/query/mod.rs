@@ -1,14 +1,20 @@
 //! The view filter query language (spec §3 "Organization", ADR 0015): a pure parser from text
 //! such as `type:task priority:<=2 due:<7d tag:work/* -status:done` to a typed [`Query`].
-//! No database and no clock; relative dates stay symbolic until [`DateValue::resolve`].
+//! [`parse`] needs no database and no clock; relative dates stay symbolic until
+//! [`DateValue::resolve`]. [`compile`] turns a [`Query`] into SQL, [`run`] runs it, and
+//! `GET /api/query` serves it.
 
+mod compile;
 mod parse;
+mod routes;
 
 use std::fmt;
 
 use chrono::{Days, Months, NaiveDate};
 
+pub use compile::{Compiled, FROM, Item, Page, Param, compile, run};
 pub use parse::parse;
+pub use routes::{DEFAULT_LIMIT, MAX_LIMIT, MAX_QUERY_CHARS, routes};
 
 /// A parsed query: every term must match (AND).
 #[derive(Debug, Clone, PartialEq, Eq)]
