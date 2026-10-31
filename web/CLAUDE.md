@@ -6,7 +6,7 @@ Svelte 5 + TypeScript single-page app built with Vite (no SvelteKit). The server
 - `npm --prefix web ci` — install exact deps from `package-lock.json`.
 - `npm --prefix web run dev` — dev server; proxies `/health` and `/api` to `http://127.0.0.1:7700`.
 - `npm --prefix web run lint | check | test | build` — the steps `scripts/verify.sh` runs.
-- `scripts/e2e.sh [playwright args]` — Playwright e2e in headless Chromium against a fresh real server (verify step `e2e`; needs `web/dist`). E.g. `scripts/e2e.sh --project phone m1`.
+- `scripts/e2e.sh [playwright args]` — Playwright e2e in headless Chromium against a fresh real server (verify step `e2e`; needs `web/dist`). Only the phone project: `scripts/e2e.sh --project=phone` (add a file filter, e.g. `scripts/e2e.sh --project=phone m1`).
 
 ## Layout
 - `src/main.ts` mounts `App.svelte`; `src/app.css` holds global tokens (palette, font, focus style).
